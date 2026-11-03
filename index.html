@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Padel With Friends</title>
+<meta name="theme-color" content="#E2F3D3">
+<link rel="icon" href="assets/ball.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/logo-text.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap">
+<style>
+:root {
+  --court: #E2F3D3; --court-deep: #C6E3B0; --card: #FFFFFF; --ink: #173A14; --ink-soft: #587A52;
+  --ball: #F2E53A; --ball-soft: #FBF7BF; --line: #CFE4C2; --accent: #86CC12; --accent-ink: #173A14;
+  --danger: #C94B45; --guest: #8E9E94; --free: #5FCB63; --booked: #E5533D; --cg-grey: #DADFD8;
+  --font-display: 'Outfit', 'Segoe UI', system-ui, sans-serif; --font-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --court: #122414; --court-deep: #1F3A1F; --card: #1A2E1B; --ink: #EAF5E4; --ink-soft: #A3BE98;
+    --ball: #E9DC3A; --ball-soft: #454218; --line: #2E4A2C; --accent: #9ADF2A; --accent-ink: #122414; --danger: #E57373; --guest: #6F8276;
+    --free: #3FA847; --booked: #C9472F; --cg-grey: #2A3A2B; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--court); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  background-image: linear-gradient(var(--court-deep) 1px, transparent 1px), linear-gradient(90deg, var(--court-deep) 1px, transparent 1px);
+  background-size: 100% 220px, 220px 100%; background-attachment: fixed;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--ball); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+[hidden] { display: none !important; }
+.brand { display: block; height: 52px; width: auto; }
+@media (max-width: 720px) { .brand { height: 42px; } }
+
+/* ---------- Login ---------- */
+#login { min-height: 100%; display: grid; place-items: center; padding-block: 24px 48px; position: relative; overflow: hidden; }
+.login-stack { width: 100%; max-width: 440px; display: grid; gap: 4px; justify-items: center; position: relative; }
+.hero-logo { width: min(100%, 400px); height: auto; filter: drop-shadow(0 14px 24px rgba(23,58,20,.18)); }
+.login-ball { position: absolute; right: -40px; bottom: 60px; width: 360px; max-width: 60vw; opacity: .9; pointer-events: none; }
+@media (max-width: 720px) { .login-ball { width: 200px; bottom: 8px; right: -30px; } }
+.login-card { width: 100%; background: var(--card); border-radius: 24px; padding: 28px; box-shadow: 0 16px 40px rgba(23,58,20,.14); display: grid; gap: 18px; position: relative; }
+.login-card h1 { font-size: 1.6rem; }
+.login-card p, .modal-card p { margin: 0; color: var(--ink-soft); }
+label { font-weight: 700; font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+.field { display: grid; gap: 6px; }
+input[type=email], input[type=text], input[type=time], select {
+  width: 100%; padding: 14px 16px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font-size: 1rem; font-family: inherit;
+}
+.btn { border: 0; border-radius: 14px; padding: 14px 18px; font-weight: 700; font-family: var(--font-display); font-size: 1rem; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-ball { background: var(--ball); color: #173A14; }
+.btn-ghost { background: transparent; color: var(--ink); border: 2px solid var(--line); }
+.btn-small { padding: 8px 12px; font-size: .9rem; border-radius: 10px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.notice { background: var(--ball-soft); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.notice strong { font-family: var(--font-display); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 140px; }
+.mailbox { display: flex; gap: 8px; align-items: center; background: var(--card); border-radius: 10px; padding: 8px 12px; border: 1px dashed var(--line); }
+.mailbox code { font-family: ui-monospace, Consolas, monospace; font-size: .9rem; user-select: all; overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.setup { background: var(--ball-soft); border-radius: 14px; padding: 14px 16px; font-size: .9rem; }
+.setup code { font-family: ui-monospace, Consolas, monospace; }
+
+/* ---------- App ---------- */
+#app { min-height: 100%; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--court); border-bottom: 1px solid var(--court-deep); }
+.topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
+.me { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border-radius: 999px; padding: 6px 12px 6px 6px; font-weight: 700; font-size: .9rem; }
+.dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .7rem; flex: none; background: var(--guest); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; font-weight: 700; color: var(--ink-soft); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.toggle input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+.linkbtn { background: none; border: 0; color: var(--ink-soft); font-weight: 700; text-decoration: underline; padding: 4px; }
+
+.weekbar { display: flex; align-items: center; justify-content: center; gap: 8px; padding-block: 16px 8px; flex-wrap: wrap; }
+.weekbar h2 { font-size: 1.2rem; min-width: 220px; text-align: center; font-variant-numeric: tabular-nums; }
+.weekbar .sub { display: block; font-family: var(--font-body); font-weight: 600; font-size: .85rem; color: var(--ink-soft); }
+.nav { width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); color: var(--ink); font-size: 1.3rem; display: grid; place-items: center; padding: 0; }
+.nav:disabled { opacity: .35; cursor: default; }
+.legend { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: .8rem; color: var(--ink-soft); padding-bottom: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.grid-meta { text-align: center; font-size: .8rem; color: var(--ink-soft); padding-bottom: 12px; }
+.grid-meta b { color: var(--ink); }
+.admin-tools { display: none; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.admin .admin-tools { display: flex; }
+
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; padding-bottom: 32px; }
+@media (max-width: 1100px) { .days { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+@media (max-width: 720px) { .days { grid-template-columns: 1fr; } .day.past-empty { display: none; } }
+.day { background: var(--card); border-radius: 20px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.day.today { outline: 3px solid var(--ball); }
+.day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.day-head h3 { font-size: 1.05rem; }
+.day-head .date { color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.day.past .day-head { opacity: .55; }
+.avail { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 30px; }
+.avail .dots { display: flex; }
+.avail .dot { width: 22px; height: 22px; font-size: .62rem; margin-left: -4px; border: 2px solid var(--card); }
+.avail .dot:first-child { margin-left: 0; }
+.avail-btn { border: 2px dashed var(--line); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 4px 10px; font-size: .8rem; font-weight: 700; }
+.avail-btn.on { background: var(--ball-soft); border-style: solid; border-color: var(--ball); color: var(--ink); }
+
+.free-block { display: grid; gap: 6px; }
+.free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
+.free-label img { height: 14px; width: auto; }
+.cg { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: .72rem; }
+.cg-h { color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; padding-right: 4px; }
+.cg-p { text-align: center; color: var(--ink-soft); font-weight: 700; font-size: .65rem; }
+.cg-cell { height: 22px; border-radius: 5px; border: 0; padding: 0; background: var(--cg-grey); cursor: default; }
+.cg-cell.free { background: var(--free); cursor: pointer; }
+.cg-cell.free:hover { filter: brightness(.9); }
+.cg-cell.booked { background: var(--booked); }
+.cg-cell.ours { background: var(--ball); }
+
+.slot { border: 2px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; }
+.slot.full { background: var(--ball-soft); border-color: var(--ball); }
+.slot.full::before { content: ""; position: absolute; right: -18px; bottom: -14px; width: 150px; height: 70px; background: url("assets/ball-swing.png") no-repeat right bottom / contain; opacity: .22; pointer-events: none; }
+.slot > * { position: relative; }
+.slot.mine { border-color: var(--accent); }
+.slot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.slot .time { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.slot .dur { font-size: .8rem; color: var(--ink-soft); }
+.slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--court); color: var(--ink); border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
+.slot.full .court { background: var(--card); }
+.seats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.seat { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px dashed var(--line); background: transparent; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .9rem; display: grid; place-items: center; padding: 0; transition: transform .12s ease; }
+.seat.taken { border-style: solid; border-color: transparent; }
+.seat.s3 { font-size: .72rem; letter-spacing: -.02em; }
+.seat.me { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--accent); }
+.seat.empty { color: var(--ink-soft); font-size: 1.3rem; }
+.seat:not(:disabled):hover { transform: scale(1.06); }
+.seat:disabled { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .seat { transition: none; } .seat:hover { transform: none; } }
+.status { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .85rem; color: var(--ink-soft); font-weight: 600; flex-wrap: wrap; }
+.status .pill { background: var(--ball); color: #173A14; border-radius: 999px; padding: 3px 10px 3px 6px; font-weight: 700; font-family: var(--font-display); font-size: .8rem; display: inline-flex; align-items: center; gap: 4px; }
+.status .pill img { height: 18px; width: auto; }
+.wait { font-size: .8rem; color: var(--ink-soft); }
+.del { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--danger); color: #fff; font-weight: 700; line-height: 1; display: none; padding: 0; }
+.admin .del { display: grid; place-items: center; }
+.add-slot { display: none; border: 2px dashed var(--court-deep); background: transparent; color: var(--ink-soft); border-radius: 14px; padding: 10px; font-weight: 700; }
+.admin .add-slot { display: block; }
+.slot-form { display: grid; gap: 8px; border: 2px solid var(--accent); border-radius: 16px; padding: 12px; }
+.slot-form input, .slot-form select { padding: 10px 12px; border-radius: 10px; }
+.empty-day { color: var(--ink-soft); font-size: .85rem; text-align: center; padding: 8px 0; display: grid; justify-items: center; gap: 4px; }
+.empty-day img { width: 110px; height: auto; opacity: .55; }
+
+/* ---------- Dialoge ---------- */
+.modal { position: fixed; inset: 0; background: rgba(23,58,20,.55); z-index: 30; display: grid; place-items: start center; padding: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); overflow: auto; }
+.modal-card { background: var(--card); color: var(--ink); border-radius: 20px; padding: 20px; width: min(100%, 980px); display: grid; gap: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.modal-card h2 { font-size: 1.3rem; }
+.imp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.imp-grid input, .imp-grid select { padding: 10px 12px; border-radius: 10px; font-size: .95rem; }
+.file-drop { border: 2px dashed var(--accent); border-radius: 14px; padding: 16px; text-align: center; display: grid; gap: 8px; justify-items: center; color: var(--ink-soft); font-size: .9rem; }
+.file-drop.over { background: var(--ball-soft); }
+.file-drop input { max-width: 100%; font-size: .9rem; }
+.preview-wrap { border: 2px solid var(--line); border-radius: 12px; overflow: hidden; }
+.preview-wrap canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
+.imp-summary { font-weight: 700; min-height: 1.4em; }
+.pl-table { display: grid; gap: 8px; }
+.pl-row { display: grid; grid-template-columns: 1.4fr .7fr 2fr 1fr auto auto auto; gap: 8px; align-items: center; }
+.pl-row input, .pl-row select { padding: 8px 10px; border-radius: 10px; font-size: .9rem; }
+.pl-row .toggle { white-space: nowrap; }
+.pl-head { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+@media (max-width: 860px) { .pl-row { grid-template-columns: 1fr 1fr; } .pl-head { display: none; } .pl-row { border-bottom: 1px solid var(--line); padding-bottom: 8px; } }
+
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--court); padding: 12px 18px; border-radius: 999px; font-weight: 700; font-family: var(--font-display); box-shadow: 0 10px 30px rgba(0,0,0,.2); opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100% - 32px); text-align: center; z-index: 40; }
+.toast.show { opacity: 1; }
+footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-block: 8px 32px; }
+.loading { text-align: center; color: var(--ink-soft); padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="wrap">
+  <img class="login-ball" src="assets/ball-trail-left.png" alt="">
+  <div class="login-stack">
+  <img class="hero-logo" src="assets/logo-login.png" alt="Padel Tennis Friends">
+  <div class="login-card">
+    <div>
+      <h1>Wer bist du?</h1>
+      <p>E-Mail eintippen, fertig. Kein Passwort, kein Code.</p>
+    </div>
+    <div id="setup-hint" class="setup" hidden></div>
+    <form id="login-form" class="field" novalidate>
+      <label for="email">Deine E-Mail</label>
+      <input type="email" id="email" placeholder="name@mail.at" autocomplete="email" inputmode="email" required>
+      <button class="btn btn-primary" type="submit" id="login-btn">Los geht's</button>
+    </form>
+    <div id="unknown" class="notice" hidden>
+      <strong>Diese Adresse ist noch nicht eingetragen.</strong>
+      <span>Du kannst trotzdem mitspielen. Als Gast bist du grau statt in deiner eigenen Farbe.</span>
+      <div class="row">
+        <button class="btn btn-ball btn-small" id="go-guest" type="button">Als Gast weitermachen</button>
+        <button class="btn btn-ghost btn-small" id="go-admin" type="button">Dem Organisator schreiben</button>
+      </div>
+      <div id="guest-box" class="field" hidden>
+        <label for="guest-name">Wie sollen wir dich nennen?</label>
+        <input type="text" id="guest-name" placeholder="Vorname" autocomplete="given-name">
+        <button class="btn btn-primary btn-small" id="guest-ok" type="button">Rein zum Padeln</button>
+      </div>
+      <div id="admin-box" class="field" hidden>
+        <span>Schick dem Organisator kurz eine Mail, dann trägt er dich mit deiner Farbe ein:</span>
+        <div class="mailbox"><code id="admin-mail"></code><button class="btn btn-ghost btn-small" id="copy-mail" type="button">Kopieren</button></div>
+      </div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" hidden>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <img class="brand" src="assets/logo-text.png" alt="Padel Tennis Friends">
+      <div class="me">
+        <span class="chip" id="me-chip"></span>
+        <label class="toggle" id="admin-toggle-wrap" hidden><input type="checkbox" id="admin-toggle"> Organisator</label>
+        <button class="linkbtn" id="logout" type="button">Abmelden</button>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="weekbar">
+      <button class="nav" id="prev" type="button" aria-label="Woche zurück">‹</button>
+      <h2 id="week-title"></h2>
+      <button class="nav" id="next" type="button" aria-label="Woche vor">›</button>
+      <button class="btn btn-ghost btn-small" id="today-btn" type="button">Heute</button>
+    </div>
+    <div class="admin-tools">
+      <button class="btn btn-ball btn-small" id="import-btn" type="button">Screenshot importieren</button>
+      <button class="btn btn-ghost btn-small" id="players-btn" type="button">Spieler verwalten</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="grid-meta" id="grid-meta"></div>
+    <div class="days" id="days"><div class="loading">Lade Termine …</div></div>
+  </main>
+  <footer>Padel With Friends · Änderungen erscheinen bei allen sofort</footer>
+</section>
+
+<!-- Import-Dialog -->
+<div class="modal" id="import-modal" hidden>
+  <div class="modal-card">
+    <div class="slot-top"><h2>Platzbelegung EUROPAHALLE importieren</h2><button class="linkbtn" id="imp-close" type="button">Schließen</button></div>
+    <p>Screenshot des Wochenplans Montag bis Sonntag aus dem Buchungssystem. Blau gilt als gebucht, Hellgrün als frei, Grau als nicht buchbar.</p>
+    <div class="imp-grid">
+      <div class="field"><label for="imp-week">Woche</label><select id="imp-week"></select></div>
+      <div class="field"><label for="imp-first">Erste Zeile</label><input type="time" id="imp-first" value="07:00"></div>
+      <div class="field"><label for="imp-last">Letzte Zeile</label><input type="time" id="imp-last" value="22:00"></div>
+      <div class="field"><label for="imp-wd">Anzeigen Mo–Fr ab</label><input type="time" id="imp-wd" value="17:00"></div>
+      <div class="field"><label for="imp-we">Anzeigen Sa/So ab</label><input type="time" id="imp-we" value="09:00"></div>
+    </div>
+    <div class="file-drop" id="file-drop">
+      <input type="file" id="imp-file" accept="image/*">
+      <span>Screenshot wählen oder hier ablegen</span>
+    </div>
+    <div class="preview-wrap" id="imp-preview-wrap" hidden><canvas id="imp-canvas"></canvas></div>
+    <div class="imp-summary" id="imp-summary"></div>
+    <div class="row"><button class="btn btn-primary" id="imp-apply" type="button" disabled>Übernehmen</button></div>
+  </div>
+</div>
+
+<!-- Spieler-Dialog -->
+<div class="modal" id="players-modal" hidden>
+  <div class="modal-card">
+    <div class="slot-top"><h2>Spieler verwalten</h2><button class="linkbtn" id="pl-close" type="button">Schließen</button></div>
+    <p>Stammspieler haben eine eigene Farbe. Gäste entstehen automatisch beim ersten Login mit unbekannter Adresse und können hier zum Stammspieler werden.</p>
+    <div class="pl-table" id="pl-table"></div>
+    <div class="row"><button class="btn btn-ghost btn-small" id="pl-add" type="button">+ Spieler anlegen</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+// ======================= Konstanten =======================
+const COURT_NAME = 'EUROPAHALLE', COURTS_PER_DAY = 3, MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
+const COURTS = ['EUROPAHALLE', 'PADELBASE', 'SPORTPARK'];
+const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
+const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+const WD_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+const MON = ['Jän','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
+
+// ======================= Datum =======================
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = new Date(); today.setHours(0, 0, 0, 0);
+function mondayOf(d) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function isoWeek(d) { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - y0) / 864e5 + 1) / 7); }
+const hourOf = v => parseInt((v || '0').split(':')[0], 10);
+const thisMonday = mondayOf(today);
+const rangeFrom = iso(thisMonday), rangeTo = iso(addDays(thisMonday, 7 * (MAX_WEEKS_AHEAD + 1)));
+
+// ======================= Zustand =======================
+const CFG = window.PWF_CONFIG || {};
+const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') && CFG.supabaseAnonKey && CFG.supabaseAnonKey !== 'DEIN-ANON-KEY';
+const sb = configured ? supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
+const DB = { players: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
+let me = null, weekOffset = 0, adminMode = false, loaded = false;
+const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
+
+const $ = sel => document.querySelector(sel);
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function fail(error, what) { console.error(what, error); toast(`${what} hat nicht geklappt: ${error.message || error}`); }
+
+const person = id => DB.players.find(p => p.id === id);
+const admins = () => DB.players.filter(p => p.admin);
+const shortOf = p => p.short || p.name.slice(0, 2);
+const slotPlayers = s => (s.signups || []).filter(x => x.kind === 'player').sort((a, b) => a.created_at.localeCompare(b.created_at));
+const slotWait = s => (s.signups || []).filter(x => x.kind === 'wait').sort((a, b) => a.created_at.localeCompare(b.created_at));
+function dot(p, cls) {
+  const d = document.createElement('span'); d.className = 'dot ' + (cls || '');
+  if (p.regular && p.color) d.style.background = p.color;
+  d.textContent = shortOf(p); d.title = p.name + (p.regular ? '' : ' (Gast)'); return d;
+}
+
+// ======================= Laden =======================
+async function loadAll() {
+  const [p, s, g, a, w] = await Promise.all([
+    sb.from('players').select('*').order('created_at'),
+    sb.from('slots').select('*, signups(*)').gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('court_grid').select('*').gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('availability').select('*').gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('settings').select('*').eq('key', 'window').maybeSingle(),
+  ]);
+  const err = [p, s, g, a, w].find(r => r.error); if (err) throw err.error;
+  DB.players = p.data; DB.slots = s.data; DB.avail = a.data;
+  DB.grids = Object.fromEntries(g.data.map(r => [r.date, r]));
+  if (w.data) DB.window = w.data.value;
+  loaded = true;
+}
+let reloadT;
+function scheduleReload() { clearTimeout(reloadT); reloadT = setTimeout(reload, 250); }
+async function reload() { try { await loadAll(); if (me) { me = person(me.id) || me; renderWeek(); } } catch (e) { fail(e, 'Laden'); } }
+function subscribe() {
+  sb.channel('pwf').on('postgres_changes', { event: '*', schema: 'public' }, scheduleReload).subscribe();
+}
+
+// ======================= Login =======================
+let pendingEmail = '';
+if (!configured) { $('#setup-hint').hidden = false; $('#setup-hint').innerHTML = 'Die App ist noch nicht mit der Datenbank verbunden. In <code>config.js</code> fehlen Supabase-URL und anon-Key.'; $('#login-btn').disabled = true; }
+$('#login-form').addEventListener('submit', async e => {
+  e.preventDefault(); if (!configured) return;
+  const email = $('#email').value.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Bitte eine gültige E-Mail eingeben.'); return; }
+  try {
+    if (!loaded) await loadAll();
+    const p = DB.players.find(x => (x.email || '').toLowerCase() === email);
+    if (p) { enter(p, p.regular ? `Servus ${p.name}! Schön, dass du da bist.` : `Hallo ${p.name}, willkommen zurück als Gast.`); return; }
+    pendingEmail = email;
+    const a = admins()[0]; $('#admin-mail').textContent = a && a.email ? a.email : 'Organisator';
+    $('#unknown').hidden = false; $('#guest-box').hidden = true; $('#admin-box').hidden = true;
+  } catch (err) { fail(err, 'Anmelden'); }
+});
+$('#go-guest').addEventListener('click', () => { $('#guest-box').hidden = false; $('#admin-box').hidden = true; $('#guest-name').focus(); });
+$('#go-admin').addEventListener('click', () => { $('#admin-box').hidden = false; $('#guest-box').hidden = true; });
+$('#copy-mail').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#admin-mail').textContent); toast('Adresse kopiert'); }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($('#admin-mail')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Adresse markiert, jetzt kopieren'); }
+});
+$('#guest-ok').addEventListener('click', async () => {
+  const name = $('#guest-name').value.trim(); if (!name) { toast('Bitte einen Namen eingeben.'); return; }
+  const { data, error } = await sb.from('players').insert({ name, email: pendingEmail, regular: false }).select().single();
+  if (error) { fail(error, 'Gast anlegen'); return; }
+  await loadAll(); $('#guest-name').value = ''; enter(data, `Hallo ${name}, du bist als Gast dabei.`);
+});
+$('#guest-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#guest-ok').click(); } });
+
+function enter(p, msg) {
+  me = p; LS.set('pwf-user', p.id); adminMode = false; weekOffset = 0;
+  $('#unknown').hidden = true; $('#email').value = '';
+  showApp(); if (msg) toast(msg);
+}
+function showApp() {
+  if (!me) { $('#login').hidden = false; $('#app').hidden = true; return; }
+  $('#login').hidden = true; $('#app').hidden = false;
+  const chip = $('#me-chip'); chip.innerHTML = ''; chip.append(dot(me), document.createTextNode(me.name + (me.regular ? '' : ' · Gast')));
+  $('#admin-toggle-wrap').hidden = !me.admin;
+  $('#admin-toggle').checked = adminMode;
+  $('#app').classList.toggle('admin', adminMode && !!me.admin);
+  renderLegend(); renderWeek();
+}
+$('#logout').addEventListener('click', () => { me = null; LS.del('pwf-user'); showApp(); });
+$('#admin-toggle').addEventListener('change', e => { adminMode = e.target.checked; showApp(); });
+
+function renderLegend() {
+  const l = $('#legend'); l.innerHTML = '';
+  const add = (bg, text, sq) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${bg}${sq ? ';border-radius:4px' : ''}"></i>${text}`; l.append(s); };
+  DB.players.filter(p => p.regular).forEach(p => add(p.color || 'var(--guest)', p.name));
+  add('var(--guest)', 'Gäste'); add('var(--ball)', 'Match steht (4 Spieler)'); add('var(--accent)', 'Deine Plätze');
+  add('var(--free)', 'Europahalle frei', true); add('var(--booked)', 'gebucht', true); add('var(--ball)', 'unser Slot', true);
+}
+
+// ======================= Woche =======================
+$('#prev').addEventListener('click', () => { if (weekOffset > 0) { weekOffset--; renderWeek(); } });
+$('#next').addEventListener('click', () => { if (weekOffset < MAX_WEEKS_AHEAD) { weekOffset++; renderWeek(); } });
+$('#today-btn').addEventListener('click', () => { weekOffset = 0; renderWeek(); });
+
+function renderWeek() {
+  const mon = addDays(thisMonday, weekOffset * 7), sun = addDays(mon, 6);
+  const range = mon.getMonth() === sun.getMonth() ? `${mon.getDate()}. – ${sun.getDate()}. ${MON[sun.getMonth()]}` : `${mon.getDate()}. ${MON[mon.getMonth()]} – ${sun.getDate()}. ${MON[sun.getMonth()]}`;
+  const label = weekOffset === 0 ? 'Diese Woche' : weekOffset === 1 ? 'Nächste Woche' : `In ${weekOffset} Wochen`;
+  $('#week-title').innerHTML = `${label}<span class="sub">KW ${isoWeek(mon)} · ${range}</span>`;
+  $('#prev').disabled = weekOffset === 0; $('#next').disabled = weekOffset === MAX_WEEKS_AHEAD;
+  const weekGrids = Array.from({ length: 7 }, (_, i) => DB.grids[iso(addDays(mon, i))]).filter(Boolean);
+  const fmt = t => { const d = new Date(t); return `${d.getDate()}. ${MON[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  $('#grid-meta').innerHTML = weekGrids.length ? `${COURT_NAME}-Belegung importiert am <b>${fmt(weekGrids[0].imported_at)}</b>` : `${COURT_NAME}: <b>noch kein Screenshot importiert</b>`;
+
+  const wrap = $('#days'); wrap.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(mon, i), key = iso(d), isPast = d < today, isToday = key === iso(today);
+    const slots = DB.slots.filter(s => s.date === key).sort((a, b) => a.time.localeCompare(b.time));
+    const col = document.createElement('section');
+    col.className = 'day' + (isToday ? ' today' : '') + (isPast ? ' past' : '') + (isPast && !slots.length ? ' past-empty' : '');
+    col.innerHTML = `<div class="day-head"><h3>${isToday ? 'Heute' : WD[i]}</h3><span class="date">${WD_SHORT[i]} ${d.getDate()}. ${MON[d.getMonth()]}</span></div>`;
+
+    const av = DB.avail.filter(a => a.date === key).map(a => a.player_id);
+    if (!isPast || av.length) {
+      const avRow = document.createElement('div'); avRow.className = 'avail';
+      const dots = document.createElement('span'); dots.className = 'dots';
+      av.map(person).filter(Boolean).forEach(p => dots.append(dot(p))); avRow.append(dots);
+      if (!isPast) {
+        const mine = av.includes(me.id);
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'avail-btn' + (mine ? ' on' : '');
+        b.textContent = mine ? '✓ Ich hätte Zeit' : (av.length ? `+ ${av.length} hätten Zeit` : '+ Ich hätte Zeit');
+        b.addEventListener('click', () => toggleAvail(key, mine)); avRow.append(b);
+      }
+      col.append(avRow);
+    }
+
+    const cg = (DB.grids[key] || {}).grid || {}, winStart = i < 5 ? DB.window.wd : DB.window.we;
+    const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && cg[hh] !== '...').sort((a, b) => a - b);
+    if (gridHours.length) {
+      const blk = document.createElement('div'); blk.className = 'free-block';
+      blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${COURT_NAME}</div>`;
+      const grid = document.createElement('div'); grid.className = 'cg';
+      grid.innerHTML = '<span></span><span class="cg-p">P1</span><span class="cg-p">P2</span><span class="cg-p">P3</span>';
+      gridHours.forEach(hh => {
+        const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${pad(hh)}:00`; grid.append(lab);
+        for (let c = 0; c < COURTS_PER_DAY; c++) {
+          const st = cg[hh][c], b = document.createElement('button'); b.type = 'button';
+          b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' : '');
+          b.title = st === 'o' ? `Platz ${c + 1}, ${pad(hh)}:00 frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? 'Unser Slot' : 'Nicht buchbar';
+          if (st === 'o') b.addEventListener('click', () => claimFree(key, hh, c)); else b.disabled = true;
+          grid.append(b);
+        }
+      });
+      blk.append(grid); col.append(blk);
+    }
+
+    if (!slots.length && !gridHours.length && !isPast) { const e = document.createElement('div'); e.className = 'empty-day'; e.innerHTML = '<img src="assets/ball-dots.png" alt=""><span>Noch kein Platz reserviert</span>'; col.append(e); }
+    slots.forEach(s => col.append(renderSlot(s, isPast)));
+    if (!isPast) {
+      const add = document.createElement('button'); add.type = 'button'; add.className = 'add-slot'; add.textContent = '+ Slot anlegen';
+      add.addEventListener('click', () => add.replaceWith(slotForm(key))); col.append(add);
+    }
+    wrap.append(col);
+  }
+}
+
+function endTime(time, dur) { const [h, m] = time.split(':').map(Number); const t = h * 60 + m + dur; return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; }
+
+function renderSlot(s, isPast) {
+  const players = slotPlayers(s), wait = slotWait(s);
+  const full = players.length >= MAX_PLAYERS, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
+  const el = document.createElement('article'); el.className = 'slot' + (full ? ' full' : '') + (mine ? ' mine' : '');
+  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><span class="court">${s.court}</span></div>`;
+  const seats = document.createElement('div'); seats.className = 'seats';
+  for (let i = 0; i < MAX_PLAYERS; i++) {
+    const su = players[i], p = su && person(su.player_id);
+    const b = document.createElement('button'); b.type = 'button';
+    if (p) {
+      const sh = shortOf(p);
+      b.className = 'seat taken' + (p.id === me.id ? ' me' : '') + (sh.length > 2 ? ' s3' : '');
+      b.style.background = p.regular && p.color ? p.color : 'var(--guest)'; b.textContent = sh;
+      b.title = p.id === me.id ? 'Du. Tippen zum Austragen.' : p.name + (p.regular ? '' : ' (Gast)');
+    } else { b.className = 'seat empty'; b.textContent = '+'; b.title = 'Freier Platz. Tippen zum Eintragen.'; }
+    if (isPast) b.disabled = true;
+    b.addEventListener('click', () => toggleSlot(s)); seats.append(b);
+  }
+  el.append(seats);
+  const open = MAX_PLAYERS - players.length, st = document.createElement('div'); st.className = 'status';
+  if (full) st.innerHTML = `<span>${mine ? 'Du bist dabei' : 'Platz ist voll'}</span><span class="pill"><img src="assets/ball.png" alt="">Match steht</span>`;
+  else if (mine) st.innerHTML = `<span>Du bist dabei</span><span>noch ${open} gesucht</span>`;
+  else st.innerHTML = `<span>${players.length} von ${MAX_PLAYERS}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
+  el.append(st);
+  if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
+  if (full && !mine && !isPast) {
+    const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'btn btn-ghost btn-small';
+    wb.textContent = onWait ? 'Von der Warteliste streichen' : 'Auf die Warteliste'; wb.addEventListener('click', () => toggleSlot(s)); el.append(wb);
+  }
+  const del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.title = 'Slot löschen';
+  del.addEventListener('click', () => deleteSlot(s)); el.append(del);
+  return el;
+}
+
+// ======================= Aktionen =======================
+async function toggleSlot(s) {
+  const mine = (s.signups || []).find(x => x.player_id === me.id);
+  try {
+    if (mine) {
+      const { error } = await sb.from('signups').delete().eq('id', mine.id); if (error) throw error;
+      toast(mine.kind === 'wait' ? 'Von der Warteliste gestrichen.' : 'Du bist ausgetragen.');
+    } else {
+      const { data, error } = await sb.from('signups').insert({ slot_id: s.id, player_id: me.id }).select().single(); if (error) throw error;
+      const n = slotPlayers(s).length + 1;
+      toast(data.kind === 'wait' ? 'Voll. Du stehst auf der Warteliste.' : n >= MAX_PLAYERS ? 'Match steht! Ihr seid zu viert.' : `Eingetragen. Noch ${MAX_PLAYERS - n} frei.`);
+    }
+    await reload();
+  } catch (e) { fail(e, 'Eintragen'); }
+}
+async function toggleAvail(key, mine) {
+  try {
+    const q = mine ? sb.from('availability').delete().eq('date', key).eq('player_id', me.id) : sb.from('availability').insert({ date: key, player_id: me.id });
+    const { error } = await q; if (error) throw error; await reload();
+  } catch (e) { fail(e, 'Speichern'); }
+}
+async function saveGrid(key, grid) {
+  const row = DB.grids[key]; if (!row) return;
+  const { error } = await sb.from('court_grid').update({ grid }).eq('date', key); if (error) throw error;
+}
+function withCell(grid, hh, c, st) { const g = { ...grid }; if (g[hh]) g[hh] = g[hh].slice(0, c) + st + g[hh].slice(c + 1); return g; }
+async function claimFree(key, hh, c) {
+  const row = DB.grids[key]; if (!row || !row.grid[hh] || row.grid[hh][c] !== 'o') return;
+  const two = !!(row.grid[hh + 1] && row.grid[hh + 1][c] === 'o'), dur = two ? 120 : 60;
+  try {
+    const { data: slot, error } = await sb.from('slots').insert({ date: key, time: `${pad(hh)}:00`, dur, court: `${COURT_NAME} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
+    const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) throw e2;
+    let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(key, g);
+    toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
+  } catch (e) { fail(e, 'Slot anlegen'); }
+}
+async function deleteSlot(s) {
+  try {
+    const { error } = await sb.from('slots').delete().eq('id', s.id); if (error) throw error;
+    const row = DB.grids[s.date];
+    if (row && s.court_idx !== null && s.court_idx !== undefined) {
+      let g = row.grid; const h0 = hourOf(s.time);
+      for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh] && g[hh][s.court_idx] === 'M') g = withCell(g, hh, s.court_idx, 'o');
+      await saveGrid(s.date, g);
+    }
+    toast('Slot gelöscht'); await reload();
+  } catch (e) { fail(e, 'Löschen'); }
+}
+function slotForm(dateKey) {
+  const f = document.createElement('form'); f.className = 'slot-form'; const uid = Math.random().toString(36).slice(2, 7);
+  f.innerHTML = `
+    <label for="t-${uid}">Uhrzeit</label><input type="time" id="t-${uid}" value="19:00" required>
+    <label for="d-${uid}">Dauer</label><select id="d-${uid}"><option value="60">60 Min</option><option value="90">90 Min</option><option value="120" selected>120 Min</option></select>
+    <label for="c-${uid}">Platz</label><input type="text" id="c-${uid}" list="courts-${uid}" value="EUROPAHALLE" required><datalist id="courts-${uid}">${COURTS.map(c => `<option value="${c}">`).join('')}</datalist>
+    <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
+  f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, court = f.querySelector(`#c-${uid}`).value.trim().toUpperCase();
+    if (!time || !court) return;
+    const { error } = await sb.from('slots').insert({ date: dateKey, time, dur, court, created_by: me.id });
+    if (error) { fail(error, 'Slot anlegen'); return; }
+    toast(`Slot ${time} in der ${court} angelegt.`); await reload();
+  });
+  return f;
+}
+
+// ======================= Spieler verwalten =======================
+$('#players-btn').addEventListener('click', () => { renderPlayers(); $('#players-modal').hidden = false; });
+$('#pl-close').addEventListener('click', () => { $('#players-modal').hidden = true; });
+$('#players-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#players-modal').hidden = true; });
+$('#pl-add').addEventListener('click', () => { $('#pl-table').append(playerRow(null)); });
+function renderPlayers() {
+  const t = $('#pl-table'); t.innerHTML = '';
+  const head = document.createElement('div'); head.className = 'pl-row pl-head';
+  head.innerHTML = '<span>Name</span><span>Kürzel</span><span>E-Mail</span><span>Farbe</span><span>Stamm</span><span>Organisator</span><span></span>'; t.append(head);
+  DB.players.forEach(p => t.append(playerRow(p)));
+}
+function playerRow(p) {
+  const r = document.createElement('div'); r.className = 'pl-row'; const uid = Math.random().toString(36).slice(2, 7);
+  const colorOpts = `<option value="">keine</option>` + PALETTE.map(([c, n]) => `<option value="${c}" ${p && p.color === c ? 'selected' : ''}>${n}</option>`).join('');
+  r.innerHTML = `
+    <input type="text" placeholder="Name" value="${p ? p.name : ''}" data-f="name" aria-label="Name">
+    <input type="text" placeholder="Kürzel" maxlength="3" value="${p ? (p.short || '') : ''}" data-f="short" aria-label="Kürzel">
+    <input type="email" placeholder="E-Mail" value="${p ? (p.email || '') : ''}" data-f="email" aria-label="E-Mail">
+    <select data-f="color" aria-label="Farbe">${colorOpts}</select>
+    <label class="toggle"><input type="checkbox" data-f="regular" ${p && p.regular ? 'checked' : ''}> Stamm</label>
+    <label class="toggle"><input type="checkbox" data-f="admin" ${p && p.admin ? 'checked' : ''}> Orga</label>
+    <button class="btn btn-primary btn-small" type="button" data-save>${p ? 'Speichern' : 'Anlegen'}</button>`;
+  r.querySelector('[data-save]').addEventListener('click', async () => {
+    const v = f => r.querySelector(`[data-f="${f}"]`);
+    const rec = { name: v('name').value.trim(), short: v('short').value.trim() || null, email: v('email').value.trim().toLowerCase() || null, color: v('color').value || null, regular: v('regular').checked, admin: v('admin').checked };
+    if (!rec.name) { toast('Name fehlt.'); return; }
+    const q = p ? sb.from('players').update(rec).eq('id', p.id) : sb.from('players').insert(rec);
+    const { error } = await q;
+    if (error) { fail(error, 'Spieler speichern'); return; }
+    toast(`${rec.name} gespeichert.`); await reload(); renderPlayers();
+  });
+  return r;
+}
+
+// ======================= Screenshot-Import =======================
+let imp = null, impImg = null;
+const inWindow = (dayIdx, hour) => hour >= (dayIdx < 5 ? hourOf($('#imp-wd').value) : hourOf($('#imp-we').value));
+function analyzeScreenshot(img, rows) {
+  const maxW = 3200, sc = Math.min(1, maxW / img.naturalWidth);
+  const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const cls = new Uint8Array(w * h);  // 1 gebucht (blau), 2 frei (hellgrün), 3 grau, 4 dunkle Linie
+  for (let i = 0, p = 0; i < cls.length; i++, p += 4) {
+    const r = d[p], g = d[p + 1], b = d[p + 2]; const grey = Math.abs(r - g) < 10 && Math.abs(g - b) < 10;
+    if (b > 170 && r < 100 && g < 120) cls[i] = 1;
+    else if (g > 228 && r > 210 && r < 253 && b > 190 && b < 245 && g > b + 4) cls[i] = 2;
+    else if (grey && r > 218 && r < 250) cls[i] = 3;
+    else if (grey && r < 218) cls[i] = 4;
+  }
+  const colCov = new Uint32Array(w), rowCov = new Uint32Array(h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = cls[y * w + x]; if (c === 1 || c === 2 || c === 3) colCov[x]++; if (c === 1 || c === 2) rowCov[y]++; }
+  const longestRun = (mask, tol) => {
+    const m = Array.from(mask); let i = 0;
+    while (i < m.length) { if (!m[i]) { let j = i; while (j < m.length && !m[j]) j++; if (i > 0 && j < m.length && j - i <= tol) for (let k = i; k < j; k++) m[k] = true; i = j; } else i++; }
+    let best = [0, -1, -1], s = -1;
+    for (let k = 0; k <= m.length; k++) { const v = k < m.length && m[k]; if (v && s < 0) s = k; if (!v && s >= 0) { if (k - s > best[0]) best = [k - s, s, k - 1]; s = -1; } }
+    return [best[1], best[2]];
+  };
+  const [x0, x1] = longestRun(Array.from(colCov, v => v > h * 0.3), Math.round(w * 0.01));
+  const [y0, y1] = longestRun(Array.from(rowCov, v => v > w * 0.05), Math.round(h * 0.01));
+  if (x0 < 0 || y0 < 0 || x1 - x0 < 200 || y1 - y0 < 100) return null;
+  const seps = []; let run = null;
+  for (let x = x0; x <= x1; x++) {
+    let dark = 0; for (let y = y0; y <= y1; y++) if (cls[y * w + x] === 4) dark++;
+    if (dark > (y1 - y0) * 0.7) { if (run && x - run.end <= 2) run.end = x; else { run = { start: x, end: x }; seps.push(run); } }
+  }
+  const sp = seps.map(s => (s.start + s.end) / 2); let bounds;
+  if (sp.length >= 2) {
+    const diffs = sp.slice(1).map((v, i) => v - sp[i]).sort((a, b) => a - b), dw = diffs[Math.floor(diffs.length / 2)];
+    const left = sp[0] - dw < x0 - 5 ? sp[0] : sp[0] - dw; bounds = Array.from({ length: 8 }, (_, i) => left + i * dw);
+  } else bounds = Array.from({ length: 8 }, (_, i) => x0 + (x1 - x0) * i / 7);
+  const rh = (y1 - y0 + 1) / rows, cells = {};
+  const sample = (cx, cy) => { const cnt = [0, 0, 0, 0, 0]; for (let y = cy - 4; y <= cy + 4; y++) for (let x = cx - 4; x <= cx + 4; x++) if (x >= 0 && y >= 0 && x < w && y < h) cnt[cls[y * w + x]]++; return cnt; };
+  for (let dIdx = 0; dIdx < 7; dIdx++) {
+    const dw = (bounds[dIdx + 1] - bounds[dIdx]) / COURTS_PER_DAY;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < COURTS_PER_DAY; c++) {
+      const cx = bounds[dIdx] + (c + 0.5) * dw, cy = y0 + (r + 0.5) * rh, tot = [0, 0, 0, 0, 0];
+      [[cx - dw * 0.25, cy], [cx + dw * 0.25, cy], [cx, cy - rh * 0.3], [cx, cy + rh * 0.3]].forEach(([px, py]) => sample(Math.round(px), Math.round(py)).forEach((v, i) => tot[i] += v));
+      cells[`${dIdx},${r},${c}`] = tot[1] > tot[2] && tot[1] > tot[3] ? 'X' : tot[2] > tot[3] ? 'o' : '.';
+    }
+  }
+  return { w, h, cv, x0, x1, y0, y1, bounds, rh, rows, cells };
+}
+function drawPreview() {
+  if (!imp) return;
+  const c = $('#imp-canvas'); c.width = imp.w; c.height = imp.h; const ctx = c.getContext('2d'); ctx.drawImage(imp.cv, 0, 0); let n = 0;
+  for (let dIdx = 0; dIdx < 7; dIdx++) {
+    const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / COURTS_PER_DAY;
+    for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < COURTS_PER_DAY; cc++) {
+      if (imp.cells[`${dIdx},${r},${cc}`] !== 'o') continue;
+      const win = inWindow(dIdx, imp.firstHour + r);
+      ctx.fillStyle = win ? 'rgba(134,204,18,.7)' : 'rgba(134,204,18,.18)';
+      ctx.fillRect(imp.bounds[dIdx] + cc * dw + 2, imp.y0 + r * imp.rh + 2, dw - 4, imp.rh - 4); if (win) n++;
+    }
+  }
+  $('#imp-summary').textContent = `${n} freie Platz-Stunden im Zeitfenster erkannt. Kräftig grün = wird angezeigt. Zelle antippen, um sie zu ändern.`;
+  $('#imp-apply').disabled = n === 0; $('#imp-apply').textContent = n ? `${n} freie Stunden übernehmen` : 'Übernehmen';
+}
+function runAnalysis() {
+  if (!impImg) return;
+  const first = hourOf($('#imp-first').value), last = hourOf($('#imp-last').value), rows = last - first + 1;
+  if (rows < 1) { toast('Letzte Zeile muss nach der ersten liegen.'); return; }
+  imp = analyzeScreenshot(impImg, rows);
+  if (!imp) { $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; toast('Raster nicht erkannt. Bitte den ganzen Wochenplan Mo bis So aufnehmen.'); return; }
+  imp.firstHour = first; $('#imp-preview-wrap').hidden = false; drawPreview();
+}
+function openImport() {
+  const sel = $('#imp-week'); sel.innerHTML = '';
+  for (let o = 0; o <= MAX_WEEKS_AHEAD; o++) {
+    const mon = addDays(thisMonday, o * 7), sun = addDays(mon, 6), opt = document.createElement('option'); opt.value = o;
+    opt.textContent = `KW ${isoWeek(mon)} · ${mon.getDate()}. ${MON[mon.getMonth()]} – ${sun.getDate()}. ${MON[sun.getMonth()]}`; sel.append(opt);
+  }
+  sel.value = weekOffset; $('#imp-wd').value = `${pad(DB.window.wd)}:00`; $('#imp-we').value = `${pad(DB.window.we)}:00`;
+  imp = null; impImg = null; $('#imp-file').value = ''; $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; $('#imp-apply').disabled = true; $('#imp-apply').textContent = 'Übernehmen';
+  $('#import-modal').hidden = false;
+}
+function closeImport() { $('#import-modal').hidden = true; if (impImg && impImg.src.startsWith('blob:')) URL.revokeObjectURL(impImg.src); imp = null; impImg = null; }
+function loadFile(f) { if (!f || !f.type.startsWith('image/')) { toast('Bitte ein Bild auswählen.'); return; } const img = new Image(); img.onload = () => { impImg = img; runAnalysis(); }; img.src = URL.createObjectURL(f); }
+$('#import-btn').addEventListener('click', openImport);
+$('#imp-close').addEventListener('click', closeImport);
+$('#import-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
+$('#imp-file').addEventListener('change', e => loadFile(e.target.files[0]));
+const drop = $('#file-drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+['#imp-first', '#imp-last'].forEach(s => $(s).addEventListener('change', runAnalysis));
+['#imp-wd', '#imp-we'].forEach(s => $(s).addEventListener('change', drawPreview));
+$('#imp-canvas').addEventListener('click', e => {
+  if (!imp) return; const rect = e.currentTarget.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * imp.w / rect.width, y = (e.clientY - rect.top) * imp.h / rect.height;
+  if (y < imp.y0 || y > imp.y1) return;
+  const dIdx = imp.bounds.findIndex((b, i) => i < 7 && x >= b && x < imp.bounds[i + 1]); if (dIdx < 0) return;
+  const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / COURTS_PER_DAY, cc = Math.floor((x - imp.bounds[dIdx]) / dw), r = Math.floor((y - imp.y0) / imp.rh);
+  const k = `${dIdx},${r},${cc}`; imp.cells[k] = imp.cells[k] === 'o' ? '.' : 'o'; drawPreview();
+});
+$('#imp-apply').addEventListener('click', async () => {
+  if (!imp) return;
+  const off = +$('#imp-week').value, mon = addDays(thisMonday, off * 7), win = { wd: hourOf($('#imp-wd').value), we: hourOf($('#imp-we').value) };
+  const rows = []; let n = 0;
+  for (let dIdx = 0; dIdx < 7; dIdx++) {
+    const key = iso(addDays(mon, dIdx)), day = {};
+    for (let r = 0; r < imp.rows; r++) {
+      const hour = imp.firstHour + r; let row = '';
+      for (let cc = 0; cc < COURTS_PER_DAY; cc++) { const st = imp.cells[`${dIdx},${r},${cc}`]; row += st; if (st === 'o' && inWindow(dIdx, hour)) n++; }
+      day[hour] = row;
+    }
+    DB.slots.filter(s => s.date === key && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
+    rows.push({ date: key, court: COURT_NAME, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
+  }
+  try {
+    const { error } = await sb.from('court_grid').upsert(rows); if (error) throw error;
+    const { error: e2 } = await sb.from('settings').upsert({ key: 'window', value: win }); if (e2) throw e2;
+    closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${COURT_NAME} übernommen.`);
+  } catch (e) { fail(e, 'Import'); }
+});
+
+// ======================= Start =======================
+(async () => {
+  if (!configured) return;
+  try {
+    await loadAll(); subscribe();
+    const saved = LS.get('pwf-user'); const p = saved && person(saved);
+    if (p) { me = p; showApp(); }
+  } catch (e) { fail(e, 'Verbindung zur Datenbank'); }
+})();
+</script>
+</body>
+</html>
