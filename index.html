@@ -35,7 +35,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 [hidden] { display: none !important; }
+.brand-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand { display: block; line-height: 0; }
+.group-chip { font-family: var(--font-display); font-weight: 700; font-size: .95rem; background: var(--ball); color: #173A14; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.group-chip:hover { filter: brightness(.95); }
+.group-chip.many::after { content: " ▾"; font-size: .8em; }
 .brand img { height: 56px; width: auto; display: block; filter: drop-shadow(0 2px 5px rgba(23,58,20,.16)); }
 @media (max-width: 720px) { .brand img { height: 40px; } }
 
@@ -48,6 +52,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .login-card { width: 100%; background: var(--card); border-radius: 24px; padding: 28px; box-shadow: 0 16px 40px rgba(23,58,20,.14); display: grid; gap: 18px; position: relative; }
 .login-card h1 { font-size: 1.6rem; }
 .login-card p, .modal-card p { margin: 0; color: var(--ink-soft); }
+.team-line { font-family: var(--font-display); font-weight: 700; color: var(--ink) !important; }
 label { font-weight: 700; font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
 .field { display: grid; gap: 6px; }
 input[type=email], input[type=text], input[type=time], select {
@@ -161,7 +166,7 @@ input[type=email], input[type=text], input[type=time], select {
 .pick-card { width: min(100%, 420px); }
 .pick-list { display: grid; gap: 6px; }
 .pick { display: flex; align-items: center; gap: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 8px 10px; font-weight: 700; text-align: left; }
-.pick:hover { border-color: var(--accent); }
+.pick:hover, .pick.me { border-color: var(--accent); }
 .pick small { font-weight: 600; color: var(--ink-soft); margin-left: 4px; }
 .pick-guest { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
 .pick-guest label { font-size: .8rem; font-weight: 700; color: var(--ink-soft); }
@@ -175,7 +180,7 @@ input[type=email], input[type=text], input[type=time], select {
 .preview-wrap canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
 .imp-summary { font-weight: 700; min-height: 1.4em; }
 .pl-table { display: grid; gap: 8px; }
-.pl-row { display: grid; grid-template-columns: 1.4fr .7fr 2fr 1fr auto auto auto; gap: 8px; align-items: center; }
+.pl-row { display: grid; grid-template-columns: 1.4fr .7fr 2fr 1fr auto auto auto auto; gap: 8px; align-items: center; }
 .pl-row input, .pl-row select { padding: 8px 10px; border-radius: 10px; font-size: .9rem; }
 .pl-row .toggle { white-space: nowrap; }
 .pl-head { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
@@ -198,6 +203,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div>
       <h1>Wer bist du?</h1>
       <p>E-Mail eintippen, fertig. Kein Passwort, kein Code.</p>
+      <p id="login-team" class="team-line" hidden></p>
     </div>
     <div id="setup-hint" class="setup" hidden></div>
     <form id="login-form" class="field" novalidate>
@@ -207,7 +213,8 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     </form>
     <div id="unknown" class="notice" hidden>
       <strong>Diese Adresse ist noch nicht eingetragen.</strong>
-      <span>Du kannst trotzdem mitspielen. Als Gast bist du grau statt in deiner eigenen Farbe.</span>
+      <span id="guest-hint">Du kannst trotzdem mitspielen. Als Gast bist du grau statt in deiner eigenen Farbe.</span>
+      <span id="no-link" hidden>Zum Mitspielen als Gast brauchst du den Link deines Teams. Frag den Organisator danach.</span>
       <div class="row">
         <button class="btn btn-ball btn-small" id="go-guest" type="button">Als Gast weitermachen</button>
         <button class="btn btn-ghost btn-small" id="go-admin" type="button">Dem Organisator schreiben</button>
@@ -230,7 +237,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <section id="app" hidden>
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="brand" href="./" aria-label="Padel With Friends"><img src="assets/logo-line.png" alt="Padel Tennis Friends"></a>
+      <div class="brand-row"><a class="brand" href="./" aria-label="Padel With Friends"><img src="assets/logo-line.png" alt="Padel Tennis Friends"></a><button class="group-chip" id="group-pill" type="button" title="Team wechseln"></button></div>
       <div class="me">
         <span class="chip" id="me-chip"></span>
         <label class="toggle" id="admin-toggle-wrap" hidden><input type="checkbox" id="admin-toggle"> Organisator</label>
@@ -254,7 +261,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div class="days" id="days"><div class="loading">Lade Termine …</div></div>
     <div class="legend legend-status" id="legend-status"></div>
   </main>
-  <footer>Padel With Friends · Änderungen erscheinen bei allen sofort</footer>
+  <footer id="foot">Padel With Friends · Änderungen erscheinen bei allen sofort</footer>
 </section>
 
 <!-- Import-Dialog -->
@@ -290,10 +297,25 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
   </div>
 </div>
 
+<div class="modal" id="group-modal" hidden>
+  <div class="modal-card pick-card">
+    <h2>Team wählen</h2>
+    <p id="group-hint"></p>
+    <div class="pick-list" id="group-list"></div>
+    <form class="pick-guest" id="group-new" hidden>
+      <label for="group-new-name">Neues Team anlegen</label>
+      <input type="text" id="group-new-name" placeholder="Name, z. B. TEAM 123" maxlength="40" autocomplete="off">
+      <input type="text" id="group-new-hall" placeholder="Halle" value="EUROPAHALLE" maxlength="40" autocomplete="off">
+      <div class="row"><button class="btn btn-primary btn-small" type="submit">Anlegen</button></div>
+    </form>
+    <div class="row"><button class="btn btn-ghost btn-small" id="group-close" type="button">Schließen</button></div>
+  </div>
+</div>
+
 <div class="modal" id="players-modal" hidden>
   <div class="modal-card">
-    <div class="slot-top"><h2>Spieler verwalten</h2><button class="linkbtn" id="pl-close" type="button">Schließen</button></div>
-    <p>Stammspieler haben eine eigene Farbe. Gäste entstehen automatisch beim ersten Login mit unbekannter Adresse und können hier zum Stammspieler werden.</p>
+    <div class="slot-top"><h2 id="pl-title">Spieler verwalten</h2><button class="linkbtn" id="pl-close" type="button">Schließen</button></div>
+    <p>Spieler dieses Teams. Stammspieler haben eine eigene Farbe, Farbe und E-Mail gelten in allen Teams. "Orga" darf in diesem Team Spieler verwalten und importieren. Eine bekannte E-Mail holt den Spieler aus einem anderen Team dazu.</p>
     <div class="pl-table" id="pl-table"></div>
     <div class="row"><button class="btn btn-ghost btn-small" id="pl-add" type="button">+ Spieler anlegen</button></div>
   </div>
@@ -305,7 +327,8 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <script src="config.js"></script>
 <script>
 // ======================= Konstanten =======================
-const COURT_NAME = 'EUROPAHALLE', COURTS_PER_DAY = 3, MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
+let COURT_NAME = 'EUROPAHALLE';
+const COURTS_PER_DAY = 3, MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
 const COURTS = ['EUROPAHALLE', 'PADELBASE', 'SPORTPARK'];
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
@@ -327,8 +350,8 @@ const rangeFrom = iso(thisMonday), rangeTo = iso(addDays(thisMonday, 7 * (MAX_WE
 const CFG = window.PWF_CONFIG || {};
 const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') && CFG.supabaseAnonKey && CFG.supabaseAnonKey !== 'DEIN-ANON-KEY';
 const sb = configured ? supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
-const DB = { players: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
-let me = null, weekOffset = 0, adminMode = false, loaded = false;
+const DB = { players: [], groups: [], memberships: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
+let me = null, G = null, weekOffset = 0, adminMode = false, loaded = false;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
 
 const $ = sel => document.querySelector(sel);
@@ -338,6 +361,14 @@ function fail(error, what) { console.error(what, error); toast(`${what} hat nich
 
 const person = id => DB.players.find(p => p.id === id);
 const admins = () => DB.players.filter(p => p.admin);
+const hashSlug = () => { try { return decodeURIComponent(location.hash.slice(1)).trim().toLowerCase(); } catch (e) { return ''; } };
+const groupBySlug = slug => DB.groups.find(g => g.slug === slug);
+const membersOf = g => DB.memberships.filter(m => m.group_id === g.id);
+const members = () => { if (!G) return []; const ids = new Set(membersOf(G).map(m => m.player_id)); return DB.players.filter(p => ids.has(p.id)); };
+const myRole = () => G && me ? (DB.memberships.find(m => m.group_id === G.id && m.player_id === me.id) || {}).role : undefined;
+const canOrganize = () => !!me && (!!me.admin || myRole() === 'organizer');
+const myGroups = () => me ? (me.admin ? DB.groups : DB.groups.filter(g => DB.memberships.some(m => m.group_id === g.id && m.player_id === me.id))) : [];
+const groupOrganizers = g => membersOf(g).filter(m => m.role === 'organizer').map(m => person(m.player_id)).filter(Boolean);
 const shortOf = p => p.short || p.name.slice(0, 2);
 const slotPlayers = s => (s.signups || []).filter(x => x.kind === 'player').sort((a, b) => a.created_at.localeCompare(b.created_at));
 const slotWait = s => (s.signups || []).filter(x => x.kind === 'wait').sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -348,23 +379,32 @@ function dot(p, cls) {
 }
 
 // ======================= Laden =======================
-async function loadAll() {
-  const [p, s, g, a, w] = await Promise.all([
+async function loadBase() {
+  const [p, g, m] = await Promise.all([
     sb.from('players').select('*').order('created_at'),
-    sb.from('slots').select('*, signups(*)').gte('date', rangeFrom).lt('date', rangeTo),
-    sb.from('court_grid').select('*').gte('date', rangeFrom).lt('date', rangeTo),
-    sb.from('availability').select('*').gte('date', rangeFrom).lt('date', rangeTo),
-    sb.from('settings').select('*').eq('key', 'window').maybeSingle(),
+    sb.from('groups').select('*').order('name'),
+    sb.from('memberships').select('*'),
   ]);
-  const err = [p, s, g, a, w].find(r => r.error); if (err) throw err.error;
-  DB.players = p.data; DB.slots = s.data; DB.avail = a.data;
-  DB.grids = Object.fromEntries(g.data.map(r => [r.date, r]));
-  if (w.data) DB.window = w.data.value;
+  const err = [p, g, m].find(r => r.error); if (err) throw err.error;
+  DB.players = p.data; DB.groups = g.data; DB.memberships = m.data;
+  if (G) { G = DB.groups.find(x => x.id === G.id) || null; applyGroup(); }
   loaded = true;
 }
+async function loadGroup() {
+  if (!G) { DB.slots = []; DB.avail = []; DB.grids = {}; return; }
+  const [s, g, a] = await Promise.all([
+    sb.from('slots').select('*, signups(*)').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('court_grid').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('availability').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
+  ]);
+  const err = [s, g, a].find(r => r.error); if (err) throw err.error;
+  DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [r.date, r]));
+}
+function applyGroup() { if (!G) return; COURT_NAME = G.hall || 'EUROPAHALLE'; DB.window = G.window || { wd: 17, we: 9 }; }
+async function loadAll() { await loadBase(); await loadGroup(); }
 let reloadT;
 function scheduleReload() { clearTimeout(reloadT); reloadT = setTimeout(reload, 250); }
-async function reload() { try { await loadAll(); if (me) { me = person(me.id) || me; renderWeek(); } } catch (e) { fail(e, 'Laden'); } }
+async function reload() { try { await loadAll(); if (me) { me = person(me.id) || me; showApp(); } } catch (e) { fail(e, 'Laden'); } }
 function subscribe() {
   sb.channel('pwf').on('postgres_changes', { event: '*', schema: 'public' }, scheduleReload).subscribe();
 }
@@ -377,11 +417,13 @@ $('#login-form').addEventListener('submit', async e => {
   const email = $('#email').value.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Bitte eine gültige E-Mail eingeben.'); return; }
   try {
-    if (!loaded) await loadAll();
+    if (!loaded) await loadBase();
     const p = DB.players.find(x => (x.email || '').toLowerCase() === email);
-    if (p) { enter(p, p.regular ? `Servus ${p.name}! Schön, dass du da bist.` : `Hallo ${p.name}, willkommen zurück als Gast.`); return; }
+    if (p) { await enter(p, p.regular ? `Servus ${p.name}! Schön, dass du da bist.` : `Hallo ${p.name}, willkommen zurück als Gast.`); return; }
     pendingEmail = email;
-    const a = admins()[0]; $('#admin-mail').textContent = a && a.email ? a.email : 'Organisator';
+    const hg = groupBySlug(hashSlug());
+    const a = (hg ? groupOrganizers(hg).find(o => o.email) : null) || admins().find(o => o.email); $('#admin-mail').textContent = a && a.email ? a.email : 'Organisator';
+    $('#go-guest').hidden = !hg; $('#guest-hint').hidden = !hg; $('#no-link').hidden = !!hg;
     $('#unknown').hidden = false; $('#guest-box').hidden = true; $('#admin-box').hidden = true;
   } catch (err) { fail(err, 'Anmelden'); }
 });
@@ -393,33 +435,97 @@ $('#copy-mail').addEventListener('click', async () => {
 });
 $('#guest-ok').addEventListener('click', async () => {
   const name = $('#guest-name').value.trim(); if (!name) { toast('Bitte einen Namen eingeben.'); return; }
+  const hg = groupBySlug(hashSlug()); if (!hg) { toast('Bitte den Link deines Teams öffnen.'); return; }
   const { data, error } = await sb.from('players').insert({ name, email: pendingEmail, regular: false }).select().single();
   if (error) { fail(error, 'Gast anlegen'); return; }
-  await loadAll(); $('#guest-name').value = ''; enter(data, `Hallo ${name}, du bist als Gast dabei.`);
+  const { error: e2 } = await sb.from('memberships').insert({ group_id: hg.id, player_id: data.id }); if (e2) { fail(e2, 'Team beitreten'); return; }
+  await loadBase(); $('#guest-name').value = ''; await enter(data, `Hallo ${name}, du bist als Gast bei ${hg.name} dabei.`);
 });
 $('#guest-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#guest-ok').click(); } });
 
-function enter(p, msg) {
+async function enter(p, msg) {
   me = p; LS.set('pwf-user', p.id); adminMode = false; weekOffset = 0;
   $('#unknown').hidden = true; $('#email').value = '';
-  showApp(); if (msg) toast(msg);
+  if (msg) toast(msg);
+  await chooseGroup();
+}
+// Team bestimmen: Link (#slug) > zuletzt gewähltes > einziges Team > Auswahl
+async function chooseGroup(preferSlug) {
+  const wanted = preferSlug || hashSlug(), fromLink = !!wanted;
+  let g = groupBySlug(wanted || LS.get('pwf-group') || '');
+  const mine = myGroups();
+  if (g && !mine.some(x => x.id === g.id)) {
+    if (fromLink && groupBySlug(wanted) === g) {
+      const { error } = await sb.from('memberships').insert({ group_id: g.id, player_id: me.id });
+      if (error) { fail(error, 'Team beitreten'); g = null; } else { await loadBase(); toast(`Willkommen bei ${g.name}!`); }
+    } else g = null;
+  }
+  if (!g) {
+    const m = myGroups();
+    if (m.length === 1) g = m[0];
+    else { G = null; showApp(); openGroupChooser(true); return; }
+  }
+  await setGroup(g);
+}
+async function setGroup(g) {
+  G = g; applyGroup(); LS.set('pwf-group', g.slug);
+  if (hashSlug() !== g.slug) history.replaceState(null, '', '#' + g.slug);
+  document.title = `${g.name} · Padel With Friends`;
+  $('#group-modal').hidden = true;
+  try { await loadGroup(); } catch (e) { fail(e, 'Laden'); }
+  showApp();
 }
 function showApp() {
-  if (!me) { $('#login').hidden = false; $('#app').hidden = true; return; }
+  if (!me) { $('#login').hidden = false; $('#app').hidden = true; document.title = 'Padel With Friends'; return; }
   $('#login').hidden = true; $('#app').hidden = false;
   const chip = $('#me-chip'); chip.innerHTML = ''; chip.append(dot(me), document.createTextNode(me.name + (me.regular ? '' : ' · Gast')));
-  $('#admin-toggle-wrap').hidden = !me.admin;
+  const pill = $('#group-pill'); pill.textContent = G ? G.name : 'Team wählen'; pill.classList.toggle('many', myGroups().length > 1 || !!me.admin);
+  $('#foot').textContent = `Padel With Friends${G ? ' · ' + G.name : ''} · Änderungen erscheinen bei allen sofort`;
+  $('#admin-toggle-wrap').hidden = !canOrganize();
+  if (!canOrganize()) adminMode = false;
   $('#admin-toggle').checked = adminMode;
-  $('#app').classList.toggle('admin', adminMode && !!me.admin);
+  $('#app').classList.toggle('admin', adminMode && canOrganize());
   renderLegend(); renderWeek();
 }
-$('#logout').addEventListener('click', () => { me = null; LS.del('pwf-user'); showApp(); });
+$('#logout').addEventListener('click', () => { me = null; G = null; LS.del('pwf-user'); showApp(); });
+window.addEventListener('hashchange', () => { const g = groupBySlug(hashSlug()); if (me && g && (!G || g.id !== G.id)) chooseGroup(g.slug); });
+
+// ======================= Team wählen / anlegen =======================
+$('#group-pill').addEventListener('click', () => openGroupChooser(false));
+$('#group-close').addEventListener('click', () => { if (G) $('#group-modal').hidden = true; });
+$('#group-modal').addEventListener('click', e => { if (e.target === e.currentTarget && G) $('#group-modal').hidden = true; });
+function openGroupChooser(forced) {
+  const list = $('#group-list'); list.innerHTML = '';
+  const mine = myGroups();
+  $('#group-hint').textContent = mine.length ? (me.admin ? 'Du siehst als Verwalter alle Teams.' : 'Du bist in mehreren Teams.') : 'Du bist noch in keinem Team. Öffne den Link deines Teams oder frag den Organisator.';
+  mine.forEach(g => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pick' + (G && G.id === g.id ? ' me' : '');
+    const n = membersOf(g).length;
+    b.innerHTML = `<span class="dot" style="background:var(--ball);color:#173A14">${g.name.replace(/^TEAM\s+/i, '').slice(0, 3)}</span>${g.name} <small>${g.hall} · ${n} Spieler</small>`;
+    b.addEventListener('click', () => setGroup(g)); list.append(b);
+  });
+  $('#group-new').hidden = !me.admin;
+  $('#group-close').hidden = forced && !G;
+  $('#group-modal').hidden = false;
+}
+$('#group-new').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#group-new-name').value.trim(), hall = ($('#group-new-hall').value.trim() || 'EUROPAHALLE').toUpperCase();
+  if (!name) { toast('Name fehlt.'); return; }
+  let base = name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'team', slug = base, i = 2;
+  while (groupBySlug(slug)) slug = base + i++;
+  try {
+    const { data, error } = await sb.from('groups').insert({ slug, name, hall }).select().single(); if (error) throw error;
+    const { error: e2 } = await sb.from('memberships').insert({ group_id: data.id, player_id: me.id, role: 'organizer' }); if (e2) throw e2;
+    $('#group-new-name').value = ''; await loadBase(); toast(`${name} angelegt. Link: ${location.origin}${location.pathname}#${slug}`); await setGroup(groupBySlug(slug));
+  } catch (err) { fail(err, 'Team anlegen'); }
+});
 $('#admin-toggle').addEventListener('change', e => { adminMode = e.target.checked; showApp(); });
 
 function renderLegend() {
   const top = $('#legend'), bottom = $('#legend-status'); top.innerHTML = ''; bottom.innerHTML = '';
   const add = (el, bg, text, sq) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${bg}${sq ? ';border-radius:4px' : ''}"></i>${text}`; el.append(s); };
-  DB.players.filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', p.name));
+  members().filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', p.name));
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
   add(bottom, 'var(--free)', `${COURT_NAME} frei`, true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
@@ -546,7 +652,7 @@ async function toggleSlot(s) {
   } catch (e) { fail(e, 'Eintragen'); }
 }
 function seatClick(s, su) {
-  const isAdmin = adminMode && !!me.admin;
+  const isAdmin = adminMode && canOrganize();
   if (!isAdmin || (su && su.player_id === me.id) || (!su && !isAdmin)) return toggleSlot(s);
   if (su) {
     const p = person(su.player_id);
@@ -569,7 +675,7 @@ function openPicker(s) {
   const taken = new Set((s.signups || []).map(x => x.player_id));
   const list = $('#pick-list'); list.innerHTML = '';
   $('#pick-title').textContent = `${s.time} · ${s.court}`;
-  const cand = DB.players.filter(p => !taken.has(p.id)).sort((a, b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
+  const cand = members().filter(p => !taken.has(p.id)).sort((a, b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
   if (!cand.length) list.innerHTML = '<p>Alle Spieler sind schon eingetragen.</p>';
   cand.forEach(p => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'pick';
@@ -582,10 +688,14 @@ let pickSlot = null;
 $('#pick-guest').addEventListener('submit', async e => {
   e.preventDefault();
   const name = $('#pick-guest-name').value.trim(); if (!name || !pickSlot) return;
-  const existing = DB.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  const existing = members().find(p => p.name.toLowerCase() === name.toLowerCase());
   try {
     let p = existing;
-    if (!p) { const { data, error } = await sb.from('players').insert({ name, regular: false }).select().single(); if (error) throw error; p = data; DB.players.push(p); }
+    if (!p) {
+      const { data, error } = await sb.from('players').insert({ name, regular: false }).select().single(); if (error) throw error; p = data;
+      const { error: e2 } = await sb.from('memberships').insert({ group_id: G.id, player_id: p.id }); if (e2) throw e2;
+      await loadBase();
+    }
     if ((pickSlot.signups || []).some(x => x.player_id === p.id)) { toast(`${p.name} ist schon eingetragen.`); return; }
     $('#pick-guest-name').value = ''; await adminSignup(pickSlot, p);
   } catch (err) { fail(err, 'Gast anlegen'); }
@@ -595,20 +705,20 @@ $('#pick-modal').addEventListener('click', e => { if (e.target === e.currentTarg
 
 async function toggleAvail(key, mine) {
   try {
-    const q = mine ? sb.from('availability').delete().eq('date', key).eq('player_id', me.id) : sb.from('availability').insert({ date: key, player_id: me.id });
+    const q = mine ? sb.from('availability').delete().eq('group_id', G.id).eq('date', key).eq('player_id', me.id) : sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id });
     const { error } = await q; if (error) throw error; await reload();
   } catch (e) { fail(e, 'Speichern'); }
 }
 async function saveGrid(key, grid) {
   const row = DB.grids[key]; if (!row) return;
-  const { error } = await sb.from('court_grid').update({ grid }).eq('date', key); if (error) throw error;
+  const { error } = await sb.from('court_grid').update({ grid }).eq('group_id', G.id).eq('date', key); if (error) throw error;
 }
 function withCell(grid, hh, c, st) { const g = { ...grid }; if (g[hh]) g[hh] = g[hh].slice(0, c) + st + g[hh].slice(c + 1); return g; }
 async function claimFree(key, hh, c) {
   const row = DB.grids[key]; if (!row || !row.grid[hh] || row.grid[hh][c] !== 'o') return;
   const two = !!(row.grid[hh + 1] && row.grid[hh + 1][c] === 'o'), dur = two ? 120 : 60;
   try {
-    const { data: slot, error } = await sb.from('slots').insert({ date: key, time: `${pad(hh)}:00`, dur, court: `${COURT_NAME} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
+    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, date: key, time: `${pad(hh)}:00`, dur, court: `${COURT_NAME} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
     const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) throw e2;
     let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(key, g);
     toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
@@ -640,7 +750,7 @@ function slotForm(dateKey) {
     const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, hall = f.querySelector(`#c-${uid}`).value.trim().toUpperCase(), pv = f.querySelector(`#p-${uid}`).value;
     if (!time || !hall) return;
     const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
-    const { error } = await sb.from('slots').insert({ date: dateKey, time, dur, court, court_idx, created_by: me.id });
+    const { error } = await sb.from('slots').insert({ group_id: G.id, date: dateKey, time, dur, court, court_idx, created_by: me.id });
     if (error) { fail(error, 'Slot anlegen'); return; }
     toast(`Slot ${time} in der ${court} angelegt.`); await reload();
   });
@@ -648,15 +758,15 @@ function slotForm(dateKey) {
 }
 
 // ======================= Spieler verwalten =======================
-$('#players-btn').addEventListener('click', () => { renderPlayers(); $('#players-modal').hidden = false; });
+$('#players-btn').addEventListener('click', () => { if (!G) return; $('#pl-title').textContent = `Spieler verwalten · ${G.name}`; renderPlayers(); $('#players-modal').hidden = false; });
 $('#pl-close').addEventListener('click', () => { $('#players-modal').hidden = true; });
 $('#players-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#players-modal').hidden = true; });
 $('#pl-add').addEventListener('click', () => { $('#pl-table').append(playerRow(null)); });
 function renderPlayers() {
   const t = $('#pl-table'); t.innerHTML = '';
   const head = document.createElement('div'); head.className = 'pl-row pl-head';
-  head.innerHTML = '<span>Name</span><span>Kürzel</span><span>E-Mail</span><span>Farbe</span><span>Stamm</span><span>Organisator</span><span></span>'; t.append(head);
-  DB.players.forEach(p => t.append(playerRow(p)));
+  head.innerHTML = '<span>Name</span><span>Kürzel</span><span>E-Mail</span><span>Farbe</span><span>Stamm</span><span>Orga</span><span></span><span></span>'; t.append(head);
+  members().sort((a, b) => (b.regular - a.regular) || a.name.localeCompare(b.name)).forEach(p => t.append(playerRow(p)));
 }
 function playerRow(p) {
   const r = document.createElement('div'); r.className = 'pl-row'; const uid = Math.random().toString(36).slice(2, 7);
@@ -667,16 +777,29 @@ function playerRow(p) {
     <input type="email" placeholder="E-Mail" value="${p ? (p.email || '') : ''}" data-f="email" aria-label="E-Mail">
     <select data-f="color" aria-label="Farbe">${colorOpts}</select>
     <label class="toggle"><input type="checkbox" data-f="regular" ${p && p.regular ? 'checked' : ''}> Stamm</label>
-    <label class="toggle"><input type="checkbox" data-f="admin" ${p && p.admin ? 'checked' : ''}> Orga</label>
-    <button class="btn btn-primary btn-small" type="button" data-save>${p ? 'Speichern' : 'Anlegen'}</button>`;
+    <label class="toggle"><input type="checkbox" data-f="orga" ${p && (p.admin || (DB.memberships.find(m => m.group_id === G.id && m.player_id === p.id) || {}).role === 'organizer') ? 'checked' : ''} ${p && p.admin ? 'disabled' : ''}> Orga</label>
+    <button class="btn btn-primary btn-small" type="button" data-save>${p ? 'Speichern' : 'Anlegen'}</button>
+    ${p && p.id !== me.id ? '<button class="linkbtn" type="button" data-remove title="Aus diesem Team entfernen">entfernen</button>' : '<span></span>'}`;
   r.querySelector('[data-save]').addEventListener('click', async () => {
     const v = f => r.querySelector(`[data-f="${f}"]`);
-    const rec = { name: v('name').value.trim(), short: v('short').value.trim() || null, email: v('email').value.trim().toLowerCase() || null, color: v('color').value || null, regular: v('regular').checked, admin: v('admin').checked };
+    const rec = { name: v('name').value.trim(), short: v('short').value.trim() || null, email: v('email').value.trim().toLowerCase() || null, color: v('color').value || null, regular: v('regular').checked };
+    const role = v('orga').checked ? 'organizer' : 'member';
     if (!rec.name) { toast('Name fehlt.'); return; }
-    const q = p ? sb.from('players').update(rec).eq('id', p.id) : sb.from('players').insert(rec);
-    const { error } = await q;
-    if (error) { fail(error, 'Spieler speichern'); return; }
-    toast(`${rec.name} gespeichert.`); await reload(); renderPlayers();
+    try {
+      let id = p ? p.id : null;
+      if (!p && rec.email) { const ex = DB.players.find(x => (x.email || '').toLowerCase() === rec.email); if (ex) { id = ex.id; if (ex.regular && !rec.color) rec.color = ex.color; } }
+      if (id) { const { error } = await sb.from('players').update(rec).eq('id', id); if (error) throw error; }
+      else { const { data, error } = await sb.from('players').insert(rec).select().single(); if (error) throw error; id = data.id; }
+      const { error: e2 } = await sb.from('memberships').upsert({ group_id: G.id, player_id: id, role }, { onConflict: 'group_id,player_id' }); if (e2) throw e2;
+      toast(`${rec.name} gespeichert.`); await reload(); renderPlayers();
+    } catch (err) { fail(err, 'Spieler speichern'); }
+  });
+  const rm = r.querySelector('[data-remove]');
+  if (rm) rm.addEventListener('click', async () => {
+    if (!confirm(`${p.name} aus ${G.name} entfernen? Der Spieler bleibt in anderen Teams erhalten.`)) return;
+    const { error } = await sb.from('memberships').delete().eq('group_id', G.id).eq('player_id', p.id);
+    if (error) { fail(error, 'Entfernen'); return; }
+    toast(`${p.name} entfernt.`); await reload(); renderPlayers();
   });
   return r;
 }
@@ -797,11 +920,11 @@ $('#imp-apply').addEventListener('click', async () => {
       day[hour] = row;
     }
     DB.slots.filter(s => s.date === key && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
-    rows.push({ date: key, court: COURT_NAME, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
+    rows.push({ group_id: G.id, date: key, court: COURT_NAME, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
   }
   try {
-    const { error } = await sb.from('court_grid').upsert(rows); if (error) throw error;
-    const { error: e2 } = await sb.from('settings').upsert({ key: 'window', value: win }); if (e2) throw e2;
+    const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,date' }); if (error) throw error;
+    const { error: e2 } = await sb.from('groups').update({ window: win }).eq('id', G.id); if (e2) throw e2;
     closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${COURT_NAME} übernommen.`);
   } catch (e) { fail(e, 'Import'); }
 });
@@ -810,9 +933,11 @@ $('#imp-apply').addEventListener('click', async () => {
 (async () => {
   if (!configured) return;
   try {
-    await loadAll(); subscribe();
+    await loadBase(); subscribe();
+    const hg = groupBySlug(hashSlug());
+    if (hg) { $('#login-team').textContent = `Du kommst zu ${hg.name}.`; $('#login-team').hidden = false; }
     const saved = LS.get('pwf-user'); const p = saved && person(saved);
-    if (p) { me = p; showApp(); }
+    if (p) { me = p; await chooseGroup(); }
   } catch (e) { fail(e, 'Verbindung zur Datenbank'); }
 })();
 </script>
