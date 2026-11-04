@@ -162,6 +162,9 @@ input[type=email], input[type=text], input[type=time], select {
 .pick { display: flex; align-items: center; gap: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 8px 10px; font-weight: 700; text-align: left; }
 .pick:hover { border-color: var(--accent); }
 .pick small { font-weight: 600; color: var(--ink-soft); margin-left: 4px; }
+.pick-guest { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.pick-guest label { font-size: .8rem; font-weight: 700; color: var(--ink-soft); }
+.pick-guest input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
 .imp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .imp-grid input, .imp-grid select { padding: 10px 12px; border-radius: 10px; font-size: .95rem; }
 .file-drop { border: 2px dashed var(--accent); border-radius: 14px; padding: 16px; text-align: center; display: grid; gap: 8px; justify-items: center; color: var(--ink-soft); font-size: .9rem; }
@@ -281,6 +284,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <h2>Spieler eintragen</h2>
     <p id="pick-title"></p>
     <div class="pick-list" id="pick-list"></div>
+    <form class="pick-guest" id="pick-guest"><label for="pick-guest-name">Neuer Gast</label><div class="row"><input type="text" id="pick-guest-name" placeholder="Name" maxlength="30" autocomplete="off"><button class="btn btn-primary btn-small" type="submit">Eintragen</button></div></form>
     <div class="row"><button class="btn btn-ghost btn-small" id="pick-close" type="button">Abbrechen</button></div>
   </div>
 </div>
@@ -569,8 +573,20 @@ function openPicker(s) {
     b.innerHTML = `<span class="dot" style="background:${p.regular && p.color ? p.color : 'var(--guest)'}">${shortOf(p)}</span>${p.name}${p.regular ? '' : ' <small>Gast</small>'}`;
     b.addEventListener('click', () => adminSignup(s, p)); list.append(b);
   });
-  $('#pick-modal').hidden = false;
+  pickSlot = s; $('#pick-guest-name').value = ''; $('#pick-modal').hidden = false;
 }
+let pickSlot = null;
+$('#pick-guest').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#pick-guest-name').value.trim(); if (!name || !pickSlot) return;
+  const existing = DB.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  try {
+    let p = existing;
+    if (!p) { const { data, error } = await sb.from('players').insert({ name, regular: false }).select().single(); if (error) throw error; p = data; DB.players.push(p); }
+    if ((pickSlot.signups || []).some(x => x.player_id === p.id)) { toast(`${p.name} ist schon eingetragen.`); return; }
+    $('#pick-guest-name').value = ''; await adminSignup(pickSlot, p);
+  } catch (err) { fail(err, 'Gast anlegen'); }
+});
 $('#pick-close').addEventListener('click', () => { $('#pick-modal').hidden = true; });
 $('#pick-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#pick-modal').hidden = true; });
 
