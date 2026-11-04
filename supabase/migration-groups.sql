@@ -8,7 +8,7 @@ create table if not exists groups (
   slug        text unique not null,
   name        text not null,
   hall        text not null default 'EUROPAHALLE',
-  window      jsonb not null default '{"wd": 17, "we": 9}',
+  view_window jsonb not null default '{"wd": 17, "we": 9}',
   created_at  timestamptz not null default now()
 );
 
@@ -55,7 +55,7 @@ select g.id, p.id, 'organizer' from groups g, players p where g.slug = 'team123'
 on conflict do nothing;
 
 -- Bisheriges Anzeigefenster übernehmen
-update groups set window = coalesce((select value from settings where key = 'window'), window) where slug = 'kite';
+update groups set view_window = coalesce((select value from settings where key = 'window'), view_window) where slug = 'kite';
 
 -- Zugriff und Live-Updates für die neuen Tabellen
 alter table groups      enable row level security;

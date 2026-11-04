@@ -400,7 +400,7 @@ async function loadGroup() {
   const err = [s, g, a].find(r => r.error); if (err) throw err.error;
   DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [r.date, r]));
 }
-function applyGroup() { if (!G) return; COURT_NAME = G.hall || 'EUROPAHALLE'; DB.window = G.window || { wd: 17, we: 9 }; }
+function applyGroup() { if (!G) return; COURT_NAME = G.hall || 'EUROPAHALLE'; DB.window = G.view_window || { wd: 17, we: 9 }; }
 async function loadAll() { await loadBase(); await loadGroup(); }
 let reloadT;
 function scheduleReload() { clearTimeout(reloadT); reloadT = setTimeout(reload, 250); }
@@ -924,7 +924,7 @@ $('#imp-apply').addEventListener('click', async () => {
   }
   try {
     const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,date' }); if (error) throw error;
-    const { error: e2 } = await sb.from('groups').update({ window: win }).eq('id', G.id); if (e2) throw e2;
+    const { error: e2 } = await sb.from('groups').update({ view_window: win }).eq('id', G.id); if (e2) throw e2;
     closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${COURT_NAME} übernommen.`);
   } catch (e) { fail(e, 'Import'); }
 });
