@@ -87,6 +87,7 @@ input[type=email], input[type=text], input[type=time], select {
 .legend { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: .8rem; color: var(--ink-soft); padding-bottom: 8px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.legend-status { padding-top: 18px; padding-bottom: 0; }
 .grid-meta { text-align: center; font-size: .8rem; color: var(--ink-soft); padding-bottom: 12px; }
 .grid-meta b { color: var(--ink); }
 .admin-tools { display: none; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -242,6 +243,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div class="legend" id="legend"></div>
     <div class="grid-meta" id="grid-meta"></div>
     <div class="days" id="days"><div class="loading">Lade Termine …</div></div>
+    <div class="legend legend-status" id="legend-status"></div>
   </main>
   <footer>Padel With Friends · Änderungen erscheinen bei allen sofort</footer>
 </section>
@@ -396,11 +398,12 @@ $('#logout').addEventListener('click', () => { me = null; LS.del('pwf-user'); sh
 $('#admin-toggle').addEventListener('change', e => { adminMode = e.target.checked; showApp(); });
 
 function renderLegend() {
-  const l = $('#legend'); l.innerHTML = '';
-  const add = (bg, text, sq) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${bg}${sq ? ';border-radius:4px' : ''}"></i>${text}`; l.append(s); };
-  DB.players.filter(p => p.regular).forEach(p => add(p.color || 'var(--guest)', p.name));
-  add('var(--guest)', 'Gäste'); add('var(--ball)', 'Match steht (4 Spieler)'); add('var(--accent)', 'Deine Plätze');
-  add('var(--free)', 'Europahalle frei', true); add('var(--booked)', 'gebucht', true); add('var(--ball)', 'unser Slot', true);
+  const top = $('#legend'), bottom = $('#legend-status'); top.innerHTML = ''; bottom.innerHTML = '';
+  const add = (el, bg, text, sq) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${bg}${sq ? ';border-radius:4px' : ''}"></i>${text}`; el.append(s); };
+  DB.players.filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', p.name));
+  add(top, 'var(--guest)', 'Gäste');
+  add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
+  add(bottom, 'var(--free)', `${COURT_NAME} frei`, true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true);
 }
 
 // ======================= Woche =======================
