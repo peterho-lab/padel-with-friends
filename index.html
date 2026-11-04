@@ -157,6 +157,11 @@ input[type=email], input[type=text], input[type=time], select {
 .modal { position: fixed; inset: 0; background: rgba(23,58,20,.55); z-index: 30; display: grid; place-items: start center; padding: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); overflow: auto; }
 .modal-card { background: var(--card); color: var(--ink); border-radius: 20px; padding: 20px; width: min(100%, 980px); display: grid; gap: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
 .modal-card h2 { font-size: 1.3rem; }
+.pick-card { width: min(100%, 420px); }
+.pick-list { display: grid; gap: 6px; }
+.pick { display: flex; align-items: center; gap: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 8px 10px; font-weight: 700; text-align: left; }
+.pick:hover { border-color: var(--accent); }
+.pick small { font-weight: 600; color: var(--ink-soft); margin-left: 4px; }
 .imp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .imp-grid input, .imp-grid select { padding: 10px 12px; border-radius: 10px; font-size: .95rem; }
 .file-drop { border: 2px dashed var(--accent); border-radius: 14px; padding: 16px; text-align: center; display: grid; gap: 8px; justify-items: center; color: var(--ink-soft); font-size: .9rem; }
@@ -271,6 +276,15 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 </div>
 
 <!-- Spieler-Dialog -->
+<div class="modal" id="pick-modal" hidden>
+  <div class="modal-card pick-card">
+    <h2>Spieler eintragen</h2>
+    <p id="pick-title"></p>
+    <div class="pick-list" id="pick-list"></div>
+    <div class="row"><button class="btn btn-ghost btn-small" id="pick-close" type="button">Abbrechen</button></div>
+  </div>
+</div>
+
 <div class="modal" id="players-modal" hidden>
   <div class="modal-card">
     <div class="slot-top"><h2>Spieler verwalten</h2><button class="linkbtn" id="pl-close" type="button">Schließen</button></div>
@@ -491,7 +505,7 @@ function renderSlot(s, isPast) {
       b.title = p.id === me.id ? 'Du. Tippen zum Austragen.' : p.name + (p.regular ? '' : ' (Gast)');
     } else { b.className = 'seat empty'; b.textContent = '+'; b.title = 'Freier Platz. Tippen zum Eintragen.'; }
     if (isPast) b.disabled = true;
-    b.addEventListener('click', () => toggleSlot(s)); seats.append(b);
+    b.addEventListener('click', () => seatClick(s, su)); seats.append(b);
   }
   el.append(seats);
   const open = MAX_PLAYERS - players.length, st = document.createElement('div'); st.className = 'status';
@@ -524,6 +538,42 @@ async function toggleSlot(s) {
     await reload();
   } catch (e) { fail(e, 'Eintragen'); }
 }
+function seatClick(s, su) {
+  const isAdmin = adminMode && !!me.admin;
+  if (!isAdmin || (su && su.player_id === me.id) || (!su && !isAdmin)) return toggleSlot(s);
+  if (su) {
+    const p = person(su.player_id);
+    if (confirm(`${p ? p.name : 'Spieler'} aus dem Slot ${s.time} austragen?`)) adminRemove(su);
+  } else openPicker(s);
+}
+async function adminRemove(su) {
+  try { const { error } = await sb.from('signups').delete().eq('id', su.id); if (error) throw error; toast('Ausgetragen.'); await reload(); }
+  catch (e) { fail(e, 'Austragen'); }
+}
+async function adminSignup(s, p) {
+  try {
+    const { data, error } = await sb.from('signups').insert({ slot_id: s.id, player_id: p.id }).select().single(); if (error) throw error;
+    const n = slotPlayers(s).length + 1;
+    toast(data.kind === 'wait' ? `${p.name} steht auf der Warteliste.` : n >= MAX_PLAYERS ? `${p.name} eingetragen. Match steht!` : `${p.name} eingetragen. Noch ${MAX_PLAYERS - n} frei.`);
+    $('#pick-modal').hidden = true; await reload();
+  } catch (e) { fail(e, 'Eintragen'); }
+}
+function openPicker(s) {
+  const taken = new Set((s.signups || []).map(x => x.player_id));
+  const list = $('#pick-list'); list.innerHTML = '';
+  $('#pick-title').textContent = `${s.time} · ${s.court}`;
+  const cand = DB.players.filter(p => !taken.has(p.id)).sort((a, b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
+  if (!cand.length) list.innerHTML = '<p>Alle Spieler sind schon eingetragen.</p>';
+  cand.forEach(p => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pick';
+    b.innerHTML = `<span class="dot" style="background:${p.regular && p.color ? p.color : 'var(--guest)'}">${shortOf(p)}</span>${p.name}${p.regular ? '' : ' <small>Gast</small>'}`;
+    b.addEventListener('click', () => adminSignup(s, p)); list.append(b);
+  });
+  $('#pick-modal').hidden = false;
+}
+$('#pick-close').addEventListener('click', () => { $('#pick-modal').hidden = true; });
+$('#pick-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#pick-modal').hidden = true; });
+
 async function toggleAvail(key, mine) {
   try {
     const q = mine ? sb.from('availability').delete().eq('date', key).eq('player_id', me.id) : sb.from('availability').insert({ date: key, player_id: me.id });
