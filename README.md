@@ -18,7 +18,7 @@ Der Organisator importiert die Platzbelegung der EUROPAHALLE per Screenshot, die
 2. Im Supabase SQL-Editor zuerst `supabase/schema.sql` ausführen, dann die lokale `supabase/seed.sql` (Spieler).
 3. In `config.js` die Project URL und den anon-Key eintragen (Project Settings → API).
 4. Seite veröffentlichen: GitHub Pages aus dem `main`-Branch, Ordner `/` (root).
-5. Domain: bei der Domain A-Records auf die GitHub-Pages-Adressen setzen, in den Repository-Einstellungen unter Pages die Domain eintragen.
+5. Domain `padelwithfriends.at`: A-Records auf 185.199.108.153, 185.199.109.153, 185.199.110.153, 185.199.111.153 und CNAME `www` → `peterho-lab.github.io`; die Datei `CNAME` im Repository trägt die Domain bei GitHub Pages ein.
 
 ## Sicherheit
 
