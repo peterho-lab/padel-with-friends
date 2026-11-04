@@ -472,11 +472,11 @@ function renderWeek() {
       const grid = document.createElement('div'); grid.className = 'cg';
       grid.innerHTML = '<span></span><span class="cg-p">P1</span><span class="cg-p">P2</span><span class="cg-p">P3</span>';
       gridHours.forEach(hh => {
-        const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${pad(hh)}:00`; grid.append(lab);
+        const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${hh}–${hh + 1}`; lab.title = `${pad(hh)}:00 bis ${pad(hh + 1)}:00`; grid.append(lab);
         for (let c = 0; c < COURTS_PER_DAY; c++) {
           const ov = overlay[`${hh},${c}`], st = ov ? 'M' : cg[hh][c], b = document.createElement('button'); b.type = 'button';
           b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '');
-          b.title = st === 'o' ? `Platz ${c + 1}, ${pad(hh)}:00 frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
+          b.title = st === 'o' ? `Platz ${c + 1}, ${hh}–${hh + 1} Uhr frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
           if (st === 'o') b.addEventListener('click', () => claimFree(key, hh, c)); else b.disabled = true;
           grid.append(b);
         }
