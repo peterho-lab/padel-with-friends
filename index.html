@@ -562,14 +562,16 @@ function slotForm(dateKey) {
   f.innerHTML = `
     <label for="t-${uid}">Uhrzeit</label><input type="time" id="t-${uid}" value="19:00" required>
     <label for="d-${uid}">Dauer</label><select id="d-${uid}"><option value="60">60 Min</option><option value="90">90 Min</option><option value="120" selected>120 Min</option></select>
-    <label for="c-${uid}">Platz</label><input type="text" id="c-${uid}" list="courts-${uid}" value="EUROPAHALLE" required><datalist id="courts-${uid}">${COURTS.map(c => `<option value="${c}">`).join('')}</datalist>
+    <label for="c-${uid}">Halle</label><input type="text" id="c-${uid}" list="courts-${uid}" value="${COURT_NAME}" required><datalist id="courts-${uid}">${COURTS.map(c => `<option value="${c}">`).join('')}</datalist>
+    <label for="p-${uid}">Platz</label><select id="p-${uid}">${Array.from({ length: COURTS_PER_DAY }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('')}<option value="">ohne Platz</option></select>
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   f.addEventListener('submit', async e => {
     e.preventDefault();
-    const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, court = f.querySelector(`#c-${uid}`).value.trim().toUpperCase();
-    if (!time || !court) return;
-    const { error } = await sb.from('slots').insert({ date: dateKey, time, dur, court, created_by: me.id });
+    const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, hall = f.querySelector(`#c-${uid}`).value.trim().toUpperCase(), pv = f.querySelector(`#p-${uid}`).value;
+    if (!time || !hall) return;
+    const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
+    const { error } = await sb.from('slots').insert({ date: dateKey, time, dur, court, court_idx, created_by: me.id });
     if (error) { fail(error, 'Slot anlegen'); return; }
     toast(`Slot ${time} in der ${court} angelegt.`); await reload();
   });
