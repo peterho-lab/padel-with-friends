@@ -12,14 +12,14 @@
 :root {
   --court: #E2F3D3; --court-deep: #C6E3B0; --card: #FFFFFF; --ink: #173A14; --ink-soft: #587A52;
   --ball: #F2E53A; --ball-soft: #FBF7BF; --line: #CFE4C2; --accent: #86CC12; --accent-ink: #173A14;
-  --danger: #C94B45; --guest: #8E9E94; --free: #5FCB63; --booked: #E5533D; --cg-grey: #DADFD8;
+  --danger: #C94B45; --guest: #8E9E94; --free: #5FCB63; --booked: #E5533D; --cg-grey: #DADFD8; --match: #F08A24;
   --font-display: 'Outfit', 'Segoe UI', system-ui, sans-serif; --font-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --court: #122414; --court-deep: #1F3A1F; --card: #1A2E1B; --ink: #EAF5E4; --ink-soft: #A3BE98;
     --ball: #E9DC3A; --ball-soft: #454218; --line: #2E4A2C; --accent: #9ADF2A; --accent-ink: #122414; --danger: #E57373; --guest: #6F8276;
-    --free: #3FA847; --booked: #C9472F; --cg-grey: #2A3A2B; color-scheme: dark;
+    --free: #3FA847; --booked: #C9472F; --cg-grey: #2A3A2B; --match: #F59A3C; color-scheme: dark;
   }
 }
 * { box-sizing: border-box; }
@@ -120,6 +120,7 @@ input[type=email], input[type=text], input[type=time], select {
 .cg-cell.free:hover { filter: brightness(.9); }
 .cg-cell.booked { background: var(--booked); }
 .cg-cell.ours { background: var(--ball); }
+.cg-cell.ours.full { box-shadow: inset 0 0 0 3px var(--match); }
 
 .slot { border: 2px solid var(--ball); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; }
 .slot.full { background: var(--ball-soft); border-color: var(--ball); }
@@ -421,7 +422,7 @@ function renderLegend() {
   DB.players.filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', p.name));
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
-  add(bottom, 'var(--free)', `${COURT_NAME} frei`, true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true);
+  add(bottom, 'var(--free)', `${COURT_NAME} frei`, true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
 }
 
 // ======================= Woche =======================
@@ -463,6 +464,8 @@ function renderWeek() {
 
     const cg = (DB.grids[key] || {}).grid || {}, winStart = i < 5 ? DB.window.wd : DB.window.we;
     const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && cg[hh] !== '...').sort((a, b) => a - b);
+    const overlay = {};
+    DB.slots.filter(s => s.date === key && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
     if (gridHours.length) {
       const blk = document.createElement('div'); blk.className = 'free-block';
       blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${COURT_NAME}</div>`;
@@ -471,9 +474,9 @@ function renderWeek() {
       gridHours.forEach(hh => {
         const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${pad(hh)}:00`; grid.append(lab);
         for (let c = 0; c < COURTS_PER_DAY; c++) {
-          const st = cg[hh][c], b = document.createElement('button'); b.type = 'button';
-          b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' : '');
-          b.title = st === 'o' ? `Platz ${c + 1}, ${pad(hh)}:00 frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? 'Unser Slot' : 'Nicht buchbar';
+          const ov = overlay[`${hh},${c}`], st = ov ? 'M' : cg[hh][c], b = document.createElement('button'); b.type = 'button';
+          b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '');
+          b.title = st === 'o' ? `Platz ${c + 1}, ${pad(hh)}:00 frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
           if (st === 'o') b.addEventListener('click', () => claimFree(key, hh, c)); else b.disabled = true;
           grid.append(b);
         }
