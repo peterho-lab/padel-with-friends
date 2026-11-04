@@ -121,7 +121,7 @@ input[type=email], input[type=text], input[type=time], select {
 .cg-cell.booked { background: var(--booked); }
 .cg-cell.ours { background: var(--ball); }
 
-.slot { border: 2px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; }
+.slot { border: 2px solid var(--ball); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; }
 .slot.full { background: var(--ball-soft); border-color: var(--ball); }
 .slot.full::before { content: ""; position: absolute; right: -18px; bottom: -14px; width: 150px; height: 70px; background: url("assets/ball-swing.png") no-repeat right bottom / contain; opacity: .22; pointer-events: none; }
 .slot > * { position: relative; }
@@ -129,8 +129,8 @@ input[type=email], input[type=text], input[type=time], select {
 .slot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .slot .time { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .slot .dur { font-size: .8rem; color: var(--ink-soft); }
-.slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--court); color: var(--ink); border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
-.slot.full .court { background: var(--card); }
+.slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--ball); color: #173A14; border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
+.slot.full .court { background: var(--card); color: var(--ink); }
 .seats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .seat { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px dashed var(--line); background: transparent; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .9rem; display: grid; place-items: center; padding: 0; transition: transform .12s ease; }
 .seat.taken { border-style: solid; border-color: transparent; }
