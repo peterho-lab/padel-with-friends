@@ -35,8 +35,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 [hidden] { display: none !important; }
-.brand { display: block; height: 52px; width: auto; }
-@media (max-width: 720px) { .brand { height: 42px; } }
+.brand { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; color: inherit; }
+.brand img { height: 30px; width: auto; display: block; }
+.brand-word { font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; letter-spacing: -.01em; line-height: 1; color: var(--accent); text-shadow: 2px 2px 0 var(--accent-ink); }
+.brand-word em { font-style: normal; color: var(--ball); }
+@media (max-width: 720px) { .brand img { height: 24px; } .brand-word { font-size: 1.2rem; text-shadow: 1.5px 1.5px 0 var(--accent-ink); } }
 
 /* ---------- Login ---------- */
 #login { min-height: 100%; display: grid; place-items: center; padding-block: 24px 48px; position: relative; overflow: hidden; }
@@ -219,7 +222,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <section id="app" hidden>
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <img class="brand" src="assets/logo-text.png" alt="Padel Tennis Friends">
+      <a class="brand" href="./" aria-label="Padel With Friends"><img src="assets/ball.png" alt=""><span class="brand-word">Padel <em>With</em> Friends</span></a>
       <div class="me">
         <span class="chip" id="me-chip"></span>
         <label class="toggle" id="admin-toggle-wrap" hidden><input type="checkbox" id="admin-toggle"> Organisator</label>
