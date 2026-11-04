@@ -447,10 +447,10 @@ async function enter(p, msg) {
   me = p; LS.set('pwf-user', p.id); adminMode = false; weekOffset = 0;
   $('#unknown').hidden = true; $('#email').value = '';
   if (msg) toast(msg);
-  await chooseGroup();
+  await chooseGroup(undefined, true);
 }
 // Team bestimmen: Link (#slug) > zuletzt gewähltes > einziges Team > Auswahl
-async function chooseGroup(preferSlug) {
+async function chooseGroup(preferSlug, atLogin) {
   const wanted = preferSlug || hashSlug(), fromLink = !!wanted;
   let g = groupBySlug(wanted || LS.get('pwf-group') || '');
   const mine = myGroups();
@@ -460,8 +460,9 @@ async function chooseGroup(preferSlug) {
       if (error) { fail(error, 'Team beitreten'); g = null; } else { await loadBase(); toast(`Willkommen bei ${g.name}!`); }
     } else g = null;
   }
+  const m = myGroups();
+  if (atLogin && m.length > 1) { G = null; showApp(); openGroupChooser(true, g); return; }   // beim Login wählen, wer mehrere Teams hat
   if (!g) {
-    const m = myGroups();
     if (m.length === 1) g = m[0];
     else { G = null; showApp(); openGroupChooser(true); return; }
   }
@@ -494,12 +495,12 @@ window.addEventListener('hashchange', () => { const g = groupBySlug(hashSlug());
 $('#group-pill').addEventListener('click', () => openGroupChooser(false));
 $('#group-close').addEventListener('click', () => { if (G) $('#group-modal').hidden = true; });
 $('#group-modal').addEventListener('click', e => { if (e.target === e.currentTarget && G) $('#group-modal').hidden = true; });
-function openGroupChooser(forced) {
+function openGroupChooser(forced, suggested) {
   const list = $('#group-list'); list.innerHTML = '';
-  const mine = myGroups();
-  $('#group-hint').textContent = mine.length ? (me.admin ? 'Du siehst als Verwalter alle Teams.' : 'Du bist in mehreren Teams.') : 'Du bist noch in keinem Team. Öffne den Link deines Teams oder frag den Organisator.';
+  const mine = myGroups(), cur = G || suggested;
+  $('#group-hint').textContent = mine.length ? (forced && !G ? 'In welchem Team willst du spielen?' : me.admin ? 'Du siehst als Verwalter alle Teams.' : 'Du bist in mehreren Teams.') : 'Du bist noch in keinem Team. Öffne den Link deines Teams oder frag den Organisator.';
   mine.forEach(g => {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'pick' + (G && G.id === g.id ? ' me' : '');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pick' + (cur && cur.id === g.id ? ' me' : '');
     const n = membersOf(g).length;
     b.innerHTML = `<span class="dot" style="background:var(--ball);color:#173A14">${g.name.replace(/^TEAM\s+/i, '').slice(0, 3)}</span>${g.name} <small>${g.hall} · ${n} Spieler</small>`;
     b.addEventListener('click', () => setGroup(g)); list.append(b);
