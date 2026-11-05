@@ -1200,7 +1200,9 @@ $('#imp-apply').addEventListener('click', async () => {
   if (!imp) return;
   const off = +$('#imp-week').value, mon = addDays(thisMonday, off * 7), win = { wd: hourOf($('#imp-wd').value), we: hourOf($('#imp-we').value) };
   const hall = hallById($('#imp-hall').value); if (!hall) return;
-  const rows = []; let n = 0;
+  // Die Belegung gilt für alle Teams, die diese Halle nutzen (eigene Slots werden beim Anzeigen pro Team darübergelegt)
+  const groupIds = [...new Set(DB.groupHalls.filter(gh => gh.hall_id === hall.id).map(gh => gh.group_id).concat(G.id))];
+  const rows = [], stamp = new Date().toISOString(); let n = 0;
   for (let dIdx = 0; dIdx < 7; dIdx++) {
     const key = iso(addDays(mon, dIdx)), day = {};
     for (let r = 0; r < imp.rows; r++) {
@@ -1208,14 +1210,15 @@ $('#imp-apply').addEventListener('click', async () => {
       for (let cc = 0; cc < imp.courts; cc++) { const st = imp.cells[`${dIdx},${r},${cc}`]; row += st; if (st === 'o' && inWindow(dIdx, hour)) n++; }
       day[hour] = row;
     }
-    DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
-    rows.push({ group_id: G.id, hall_id: hall.id, date: key, court: hall.name, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
+    groupIds.forEach(gid => rows.push({ group_id: gid, hall_id: hall.id, date: key, court: hall.name, grid: day, source: 'screenshot', imported_at: stamp }));
   }
   try {
     const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,hall_id,date' }); if (error) throw error;
     const { error: e2 } = await sb.from('groups').update({ view_window: win }).eq('id', G.id); if (e2) throw e2;
     const { error: e3 } = await sb.from('halls').update({ first_hour: imp.firstHour, last_hour: imp.firstHour + imp.rows - 1 }).eq('id', hall.id); if (e3) throw e3;
-    closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${hall.name} übernommen.`);
+    closeImport(); weekOffset = off; await reload();
+    const teams = groupIds.map(gid => (DB.groups.find(g => g.id === gid) || {}).name).filter(Boolean);
+    toast(`${n} freie Platz-Stunden für ${hall.name} übernommen` + (teams.length > 1 ? ` (${teams.join(', ')}).` : '.'));
   } catch (e) { fail(e, 'Import'); }
 });
 
