@@ -125,6 +125,10 @@ input[type=email], input[type=text], input[type=time], select {
 .avail-pick button.ghost { border-color: var(--line); background: transparent; color: var(--ink-soft); }
 
 .free-block { display: grid; gap: 6px; }
+.hall-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.hall-tab { border: 2px solid var(--line); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.hall-tab.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.hall-tab.nogrid { border-style: dashed; }
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
 .free-label img { height: 14px; width: auto; }
 .cg { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: .72rem; }
@@ -408,6 +412,7 @@ const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') 
 const sb = configured ? supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
 const DB = { players: [], groups: [], memberships: [], halls: [], groupHalls: [], slots: [], avail: [], grids: {}, window: { wd: 7, we: 7 } };
 let me = null, G = null, weekOffset = 0, adminMode = false, loaded = false;
+const dayHall = {};   // pro Tag gewählte Halle (bei mehreren Hallen im Team)
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
 
 const $ = sel => document.querySelector(sel);
@@ -656,7 +661,16 @@ function renderWeek() {
     }
 
     const winStart = i < 5 ? DB.window.wd : DB.window.we; let anyGrid = false;
-    halls.forEach(hall => {
+    let dayHalls = halls;
+    if (halls.length > 1 && !isPast) {
+      const withGrid = halls.filter(h => DB.grids[gridKey(h.id, key)]);
+      let pick = hallById(dayHall[key] || LS.get('pwf-hall-' + G.id)) ; if (!pick || !halls.includes(pick)) pick = withGrid[0] || halls[0];
+      dayHalls = [pick];
+      const tabs = document.createElement('div'); tabs.className = 'hall-tabs';
+      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; LS.set('pwf-hall-' + G.id, h.id); renderWeek(); }); tabs.append(b); });
+      col.append(tabs);
+    }
+    dayHalls.forEach(hall => {
       const cg = (DB.grids[gridKey(hall.id, key)] || {}).grid || {};
       const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && !/^\.+$/.test(cg[hh])).sort((a, b) => a - b);
       if (!gridHours.length) return; anyGrid = true;
@@ -915,6 +929,7 @@ function slotForm(dateKey) {
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
+  const pre = dayHall[dateKey] || LS.get('pwf-hall-' + G.id); if (pre && hallById(pre)) hallSel.value = pre;
   const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
   hallSel.addEventListener('change', fillPlaces); fillPlaces();
   const trCb = f.querySelector(`#tr-${uid}`); if (trCb) trCb.addEventListener('change', () => { f.querySelector(`#trf-${uid}`).hidden = !trCb.checked; });
