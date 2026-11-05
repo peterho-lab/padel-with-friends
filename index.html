@@ -159,6 +159,14 @@ input[type=email], input[type=text], input[type=time], select {
 .slot.cancelled .seat { filter: grayscale(1); opacity: .5; }
 .cancel-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--danger); color: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: .8rem; }
 .slot .linkbtn.sm { font-size: .8rem; padding: 2px 0; justify-self: start; }
+.comments { display: grid; gap: 6px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.comment { display: flex; gap: 8px; align-items: flex-start; font-size: .85rem; line-height: 1.35; }
+.comment .dot { width: 22px; height: 22px; font-size: .62rem; margin-top: 1px; }
+.comment b { font-weight: 700; }
+.comment .cdel { margin-left: auto; background: none; border: 0; color: var(--ink-soft); padding: 0 2px; cursor: pointer; font-size: 1rem; line-height: 1; }
+.comment-form { display: flex; gap: 6px; }
+.comment-form input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: .85rem; }
+.comment-form button { border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 12px; }
 .del { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--danger); color: #fff; font-weight: 700; line-height: 1; display: none; padding: 0; }
 .admin .del { display: grid; place-items: center; }
 .add-slot { display: none; border: 2px dashed var(--court-deep); background: transparent; color: var(--ink-soft); border-radius: 14px; padding: 10px; font-weight: 700; }
@@ -420,7 +428,7 @@ async function loadBase() {
 async function loadGroup() {
   if (!G) { DB.slots = []; DB.avail = []; DB.grids = {}; return; }
   const [s, g, a] = await Promise.all([
-    sb.from('slots').select('*, signups(*)').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
+    sb.from('slots').select('*, signups(*), comments(*)').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
     sb.from('court_grid').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
     sb.from('availability').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
   ]);
@@ -671,9 +679,43 @@ function renderSlot(s, isPast) {
     const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'btn btn-ghost btn-small';
     wb.textContent = onWait ? 'Von der Warteliste streichen' : 'Auf die Warteliste'; wb.addEventListener('click', () => toggleSlot(s)); el.append(wb);
   }
+  el.append(renderComments(s, isPast));
   const del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.title = 'Slot löschen';
   del.addEventListener('click', () => deleteSlot(s)); el.append(del);
   return el;
+}
+
+function renderComments(s, isPast) {
+  const box = document.createElement('div'); box.className = 'comments';
+  const list = (s.comments || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
+  list.forEach(c => {
+    const p = person(c.player_id), row = document.createElement('div'); row.className = 'comment';
+    if (p) row.append(dot(p)); else { const d = document.createElement('span'); d.className = 'dot'; d.textContent = '?'; row.append(d); }
+    const t = document.createElement('span'); t.innerHTML = `<b>${p ? p.name : 'Unbekannt'}:</b> `; t.append(document.createTextNode(c.text)); row.append(t);
+    if (!isPast && (c.player_id === me.id || canOrganize())) { const x = document.createElement('button'); x.type = 'button'; x.className = 'cdel'; x.textContent = '×'; x.title = 'Kommentar löschen'; x.addEventListener('click', () => deleteComment(c)); row.append(x); }
+    box.append(row);
+  });
+  if (!isPast) {
+    const f = document.createElement('form'); f.className = 'comment-form';
+    f.innerHTML = '<input type="text" maxlength="240" placeholder="Kommentar, max. 3 Sätze" autocomplete="off"><button type="submit">Senden</button>';
+    f.addEventListener('submit', e => { e.preventDefault(); addComment(s, f.querySelector('input')); });
+    box.append(f);
+  }
+  if (!list.length && isPast) box.hidden = true;
+  return box;
+}
+async function addComment(s, input) {
+  const text = input.value.trim().replace(/\s+/g, ' '); if (!text) return;
+  const sentences = text.split(/[.!?]+\s|[.!?]+$/).filter(x => x.trim()).length;
+  if (sentences > 3) { toast('Bitte maximal 3 Sätze.'); return; }
+  try {
+    const { error } = await sb.from('comments').insert({ slot_id: s.id, player_id: me.id, text }); if (error) throw error;
+    input.value = ''; await reload();
+  } catch (e) { fail(e, 'Kommentar'); }
+}
+async function deleteComment(c) {
+  try { const { error } = await sb.from('comments').delete().eq('id', c.id); if (error) throw error; await reload(); }
+  catch (e) { fail(e, 'Kommentar löschen'); }
 }
 
 // ======================= Aktionen =======================
