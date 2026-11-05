@@ -866,9 +866,10 @@ function slotForm(dateKey) {
     const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, h = hallById(hallSel.value), hall = h ? h.name : nameIn.value.trim().toUpperCase(), pv = placeSel.value;
     if (!time || !hall) { toast('Halle fehlt.'); return; }
     const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
-    const { error } = await sb.from('slots').insert({ group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id });
+    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id }).select().single();
     if (error) { fail(error, 'Slot anlegen'); return; }
-    toast(`Slot ${time} in der ${court} angelegt.`); await reload();
+    const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) { fail(e2, 'Eintragen'); }
+    toast(`Slot ${time} in der ${court} angelegt, du bist eingetragen.`); await reload();
   });
   return f;
 }
