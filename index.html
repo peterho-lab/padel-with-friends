@@ -99,6 +99,7 @@ input[type=email], input[type=text], input[type=time], select {
 .admin .admin-tools { display: flex; }
 
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; padding-bottom: 32px; }
+@media (max-width: 1500px) { .days { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); } }
 @media (max-width: 1100px) { .days { grid-template-columns: repeat(4, minmax(0,1fr)); } }
 @media (max-width: 720px) { .days { grid-template-columns: 1fr; } .day.past-empty { display: none; } }
 .day { background: var(--card); border-radius: 20px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
@@ -130,20 +131,21 @@ input[type=email], input[type=text], input[type=time], select {
 .cg-cell.ours { background: var(--ball); }
 .cg-cell.ours.full { box-shadow: inset 0 0 0 3px var(--match); }
 
-.slot { border: 2px solid var(--ball); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; }
+.slot { border: 2px solid var(--ball); border-radius: 16px; padding: 12px; display: grid; gap: 10px; position: relative; overflow: hidden; min-width: 0; }
 .slot.full { background: var(--ball-soft); border-color: var(--ball); }
 .slot.full::before { content: ""; position: absolute; right: -18px; bottom: -14px; width: 150px; height: 70px; background: url("assets/ball-swing.png") no-repeat right bottom / contain; opacity: .22; pointer-events: none; }
-.slot > * { position: relative; }
+.slot > * { position: relative; min-width: 0; }
+.slot-top > * { min-width: 0; }
 .slot.mine { border-color: var(--accent); }
 .slot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .slot .time { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .slot .dur { font-size: .8rem; color: var(--ink-soft); }
-.slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--ball); color: #173A14; border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
+.slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; overflow-wrap: anywhere; background: var(--ball); color: #173A14; border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
 .slot.full .court { background: var(--card); color: var(--ink); }
 .slot-right { display: grid; justify-items: end; gap: 4px; max-width: 55%; }
 .slot-right .court { max-width: 100%; }
 .creator { font-size: .75rem; color: var(--ink-soft); text-align: right; }
-.seats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.seats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .seat { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px dashed var(--line); background: transparent; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .9rem; display: grid; place-items: center; padding: 0; transition: transform .12s ease; }
 .seat.taken { border-style: solid; border-color: transparent; }
 .seat.s3 { font-size: .72rem; letter-spacing: -.02em; }
@@ -169,7 +171,7 @@ input[type=email], input[type=text], input[type=time], select {
 .comment .cdel { margin-left: auto; background: none; border: 0; color: var(--ink-soft); padding: 0 2px; cursor: pointer; font-size: 1rem; line-height: 1; }
 .comment-form { display: flex; gap: 6px; }
 .comment-form input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: .85rem; }
-.comment-form button { border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 12px; }
+.comment-form button { border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 12px; flex: none; }
 .del { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--danger); color: #fff; font-weight: 700; line-height: 1; display: none; padding: 0; }
 .admin .del { display: grid; place-items: center; }
 .add-slot { display: none; border: 2px dashed var(--court-deep); background: transparent; color: var(--ink-soft); border-radius: 14px; padding: 10px; font-weight: 700; }
