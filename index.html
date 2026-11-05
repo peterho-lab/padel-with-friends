@@ -158,6 +158,10 @@ input[type=email], input[type=text], input[type=time], select {
 .slot.full .court { background: var(--card); color: var(--ink); }
 .slot-right { display: grid; justify-items: end; gap: 4px; max-width: 55%; }
 .slot-right .court { max-width: 100%; }
+.slot .court.editable { cursor: pointer; }
+.slot .court.editable:hover { filter: brightness(.93); }
+.hall-edit { display: grid; gap: 6px; justify-items: stretch; width: 100%; }
+.hall-edit select { padding: 6px 8px; border-radius: 8px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: .8rem; }
 .creator { font-size: .75rem; color: var(--ink-soft); text-align: right; }
 .seats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .seats.many { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 6px; }
@@ -714,8 +718,9 @@ function renderSlot(s, isPast) {
   const cap = capOf(s), tour = isTournament(s), full = players.length >= cap, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
   const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
   const el = document.createElement('article'); el.className = 'slot' + (tour ? ' tournament' : '') + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
-  const creator = person(s.created_by);
-  el.innerHTML = `${tour ? `<div class="tour-head"><span class="tour-tag">Turnier</span><b></b></div>` : ''}<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court">${s.court}</span><span class="creator" title="angelegt von ${creator ? creator.name : '?'}">von ${creator ? shortOf(creator) : '?'}</span></div></div>`;
+  const creator = person(s.created_by), slotHall = s.hall_id ? hallById(s.hall_id) : null;
+  el.innerHTML = `${tour ? `<div class="tour-head"><span class="tour-tag">Turnier</span><b></b></div>` : ''}<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court"${slotHall ? ` style="background:${hallColor(slotHall)};color:#fff"` : ''}>${s.court}</span><span class="creator" title="angelegt von ${creator ? creator.name : '?'}">von ${creator ? shortOf(creator) : '?'}</span></div></div>`;
+  if (!isPast && !cancelled && (canOrganize() || s.created_by === me.id)) { const cb = el.querySelector('.court'); cb.classList.add('editable'); cb.title = 'Tippen: Halle oder Platz ändern'; cb.addEventListener('click', () => hallEditor(s, el.querySelector('.slot-right'))); }
   if (tour) el.querySelector('.tour-head b').textContent = s.title || 'Turnier';
   const seats = document.createElement('div'); seats.className = 'seats'; if (cap > 4) seats.classList.add('many');
   for (let i = 0; i < cap; i++) {
@@ -881,6 +886,32 @@ async function claimFree(key, hall, hh, c) {
     let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(hall.id, key, g);
     toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
   } catch (e) { fail(e, 'Slot anlegen'); }
+}
+function hallEditor(s, host) {
+  const halls = teamHalls(); if (!halls.length) { toast('Keine Halle im Team.'); return; }
+  const box = document.createElement('div'); box.className = 'hall-edit';
+  const hs = document.createElement('select'); hs.innerHTML = halls.map(h => `<option value="${h.id}" ${h.id === s.hall_id ? 'selected' : ''}>${h.name}</option>`).join('');
+  const ps = document.createElement('select');
+  const fill = () => { const h = hallById(hs.value); ps.innerHTML = Array.from({ length: h ? h.courts : 0 }, (_, i) => `<option value="${i}" ${hs.value === s.hall_id && i === s.court_idx ? 'selected' : ''}>Platz ${i + 1}</option>`).join('') + `<option value="" ${s.court_idx === null || s.court_idx === undefined ? 'selected' : ''}>ohne Platz</option>`; };
+  hs.addEventListener('change', fill); fill();
+  const row = document.createElement('div'); row.className = 'row';
+  const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-small'; ok.textContent = 'Speichern';
+  const no = document.createElement('button'); no.type = 'button'; no.className = 'btn btn-ghost btn-small'; no.textContent = 'Abbrechen'; no.addEventListener('click', () => renderWeek());
+  ok.addEventListener('click', () => moveSlot(s, hallById(hs.value), ps.value === '' ? null : +ps.value));
+  row.append(ok, no); box.append(hs, ps, row); host.replaceWith(box);
+}
+async function moveSlot(s, hall, court_idx) {
+  if (!hall) return;
+  try {
+    // alte Markierung in der Belegung freigeben
+    const oldRow = s.hall_id ? DB.grids[gridKey(s.hall_id, s.date)] : null;
+    if (oldRow && s.court_idx !== null && s.court_idx !== undefined) { let g = oldRow.grid; const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh] && g[hh][s.court_idx] === 'M') g = withCell(g, hh, s.court_idx, 'o'); await saveGrid(s.hall_id, s.date, g); }
+    const court = court_idx === null ? hall.name : `${hall.name} · Platz ${court_idx + 1}`;
+    const { error } = await sb.from('slots').update({ hall_id: hall.id, court, court_idx }).eq('id', s.id); if (error) throw error;
+    const newRow = DB.grids[gridKey(hall.id, s.date)];
+    if (newRow && court_idx !== null) { let g = newRow.grid; const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh]) g = withCell(g, hh, court_idx, 'M'); await saveGrid(hall.id, s.date, g); }
+    toast(`Termin jetzt in ${court}.`); await reload();
+  } catch (e) { fail(e, 'Halle ändern'); }
 }
 async function cancelSlot(s) {
   if (!confirm(`Termin ${s.time} absagen? Alle im Team sehen ihn dann als abgesagt.`)) return;
