@@ -671,11 +671,12 @@ function renderWeek() {
         const mineRow = avRows.find(a => a.player_id === me.id);
         const b = document.createElement('button'); b.type = 'button'; b.className = 'avail-btn' + (mineRow ? ' on' : '');
         b.textContent = mineRow ? `✓ ${PART_LABEL[mineRow.part || 'all']}` : (av.length ? `+ ${av.length} hätten Zeit` : '+ Ich hätte Zeit');
-        b.title = mineRow ? 'Tippen zum Zurücknehmen' : 'Tippen und Zeitraum wählen';
+        b.title = mineRow ? 'Tippen: Zeitraum ändern oder zurücknehmen' : 'Tippen und Zeitraum wählen';
         b.addEventListener('click', () => {
-          if (mineRow) return toggleAvail(key, true);
+          const cur = mineRow ? (mineRow.part || 'all') : null;
           const pick = document.createElement('span'); pick.className = 'avail-pick';
-          [['all', 'Ganzer Tag'], ['am', 'Vormittag'], ['pm', 'Nachmittag']].forEach(([v, l]) => { const o = document.createElement('button'); o.type = 'button'; o.textContent = l; o.addEventListener('click', () => toggleAvail(key, false, v)); pick.append(o); });
+          [['all', 'Ganzer Tag'], ['am', 'Vormittag'], ['pm', 'Nachmittag']].forEach(([v, l]) => { const o = document.createElement('button'); o.type = 'button'; o.textContent = (cur === v ? '✓ ' : '') + l; if (cur === v) o.classList.add('on'); o.addEventListener('click', () => toggleAvail(key, false, v)); pick.append(o); });
+          if (mineRow) { const r = document.createElement('button'); r.type = 'button'; r.className = 'ghost'; r.textContent = 'Zurücknehmen'; r.addEventListener('click', () => toggleAvail(key, true)); pick.append(r); }
           const x = document.createElement('button'); x.type = 'button'; x.className = 'ghost'; x.textContent = '×'; x.addEventListener('click', () => pick.replaceWith(b)); pick.append(x);
           b.replaceWith(pick);
         });
@@ -889,8 +890,12 @@ async function toggleAvail(key, mine, part) {
   try {
     if (mine) { const { error } = await sb.from('availability').delete().eq('group_id', G.id).eq('date', key).eq('player_id', me.id); if (error) throw error; }
     else {
-      let { error } = await sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id, part: part || 'all' });
-      if (error && /part/.test(error.message || '')) ({ error } = await sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id }));   // Datenbank noch ohne Spalte part
+      const rec = { group_id: G.id, date: key, player_id: me.id }, opt = { onConflict: 'group_id,date,player_id' };
+      let { error } = await sb.from('availability').upsert({ ...rec, part: part || 'all' }, opt);
+      if (error && /part/.test(error.message || '')) {   // Datenbank noch ohne Spalte part
+        ({ error } = await sb.from('availability').upsert(rec, opt));
+        if (!error && part && part !== 'all') toast(me.admin ? 'Vormittag/Nachmittag braucht noch migration-avail-part.sql in Supabase.' : 'Zeitraum wird derzeit als ganzer Tag gespeichert.');
+      }
       if (error) throw error;
     }
     await reload();
