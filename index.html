@@ -366,7 +366,7 @@ const rangeFrom = iso(thisMonday), rangeTo = iso(addDays(thisMonday, 7 * (MAX_WE
 const CFG = window.PWF_CONFIG || {};
 const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') && CFG.supabaseAnonKey && CFG.supabaseAnonKey !== 'DEIN-ANON-KEY';
 const sb = configured ? supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
-const DB = { players: [], groups: [], memberships: [], halls: [], groupHalls: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
+const DB = { players: [], groups: [], memberships: [], halls: [], groupHalls: [], slots: [], avail: [], grids: {}, window: { wd: 7, we: 7 } };
 let me = null, G = null, weekOffset = 0, adminMode = false, loaded = false;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
 
@@ -421,7 +421,7 @@ async function loadGroup() {
   const err = [s, g, a].find(r => r.error); if (err) throw err.error;
   DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [gridKey(r.hall_id, r.date), r]));
 }
-function applyGroup() { if (!G) return; const th = teamHalls(); COURT_NAME = th.length ? th[0].name : (G.hall || 'EUROPAHALLE'); DB.window = G.view_window || { wd: 17, we: 9 }; }
+function applyGroup() { if (!G) return; const th = teamHalls(); COURT_NAME = th.length ? th[0].name : (G.hall || 'EUROPAHALLE'); DB.window = G.view_window || { wd: 7, we: 7 }; }
 async function loadAll() { await loadBase(); await loadGroup(); }
 let reloadT;
 function scheduleReload() { clearTimeout(reloadT); reloadT = setTimeout(reload, 250); }
@@ -956,7 +956,7 @@ function openImport() {
   }
   sel.value = weekOffset; $('#imp-wd').value = `${pad(DB.window.wd)}:00`; $('#imp-we').value = `${pad(DB.window.we)}:00`;
   const hs = $('#imp-hall'); hs.innerHTML = teamHalls().map(h => `<option value="${h.id}">${h.name} (${h.courts} Plätze)</option>`).join('') || '<option value="">keine Halle im Team</option>';
-  const h0 = teamHalls()[0]; if (h0) { $('#imp-first').value = `${pad(h0.first_hour)}:00`; $('#imp-last').value = `${pad(h0.last_hour)}:00`; }
+  const h0 = teamHalls()[0]; if (h0) { $('#imp-first').value = `${pad(h0.first_hour)}:00`; $('#imp-last').value = `${pad(h0.last_hour)}:00`; $('#imp-wd').value = `${pad(h0.first_hour)}:00`; $('#imp-we').value = `${pad(h0.first_hour)}:00`; }
   imp = null; impImg = null; $('#imp-file').value = ''; $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; $('#imp-apply').disabled = true; $('#imp-apply').textContent = 'Übernehmen';
   $('#import-modal').hidden = false;
 }
