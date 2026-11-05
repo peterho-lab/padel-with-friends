@@ -124,10 +124,11 @@ input[type=email], input[type=text], input[type=time], select {
 .avail-pick button { border: 2px solid var(--ball); background: var(--ball-soft); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: .8rem; font-weight: 700; }
 .avail-pick button.ghost { border-color: var(--line); background: transparent; color: var(--ink-soft); }
 
-.free-block { display: grid; gap: 6px; }
+.free-block { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: color-mix(in srgb, var(--hall, var(--accent)) 14%, var(--card)); border-left: 4px solid var(--hall, var(--accent)); }
+.free-label { color: var(--ink); }
 .hall-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .hall-tab { border: 2px solid var(--line); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.hall-tab.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.hall-tab.on { border-color: var(--hall, var(--accent)); background: var(--hall, var(--accent)); color: #fff; }
 .hall-tab.nogrid { border-style: dashed; }
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
 .free-label img { height: 14px; width: auto; }
@@ -431,6 +432,8 @@ const canOrganize = () => !!me && (!!me.admin || myRole() === 'organizer');
 const myGroups = () => me ? (me.admin ? DB.groups : DB.groups.filter(g => DB.memberships.some(m => m.group_id === g.id && m.player_id === me.id))) : [];
 const groupOrganizers = g => membersOf(g).filter(m => m.role === 'organizer').map(m => person(m.player_id)).filter(Boolean);
 const hallById = id => DB.halls.find(h => h.id === id);
+const HALL_COLORS = ['#86CC12', '#3F7FD9', '#F0962E', '#8E5BD6', '#1F8A8A', '#C2185B', '#D4A017', '#5C6BC0'];
+const hallColor = h => HALL_COLORS[Math.max(0, DB.halls.findIndex(x => x.id === h.id)) % HALL_COLORS.length];
 const teamHalls = () => { if (!G) return []; const ids = new Set(DB.groupHalls.filter(x => x.group_id === G.id).map(x => x.hall_id)); return DB.halls.filter(h => ids.has(h.id)); };
 const gridKey = (hallId, date) => `${hallId}|${date}`;
 const shortOf = p => p.short || p.name.slice(0, 2);
@@ -611,6 +614,7 @@ function renderLegend() {
   members().filter(p => p.regular).forEach(p => { add(top, p.color || 'var(--guest)', `${p.name} (${shortOf(p)})`); if (online.has(p.id)) { const el = top.lastElementChild; el.classList.add('online'); el.title = 'gerade online'; } });
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
+  teamHalls().forEach(h => add(bottom, `color-mix(in srgb, ${hallColor(h)} 30%, var(--card)); border: 2px solid ${hallColor(h)}`, h.name, true));
   add(bottom, 'var(--free)', 'Halle frei', true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
 }
 
@@ -667,7 +671,7 @@ function renderWeek() {
       let pick = hallById(dayHall[key]); if (!pick || !halls.includes(pick)) pick = withGrid[0] || halls[0];
       dayHalls = [pick];
       const tabs = document.createElement('div'); tabs.className = 'hall-tabs';
-      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; renderWeek(); }); tabs.append(b); });
+      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.style.setProperty('--hall', hallColor(h)); b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; renderWeek(); }); tabs.append(b); });
       col.append(tabs);
     }
     dayHalls.forEach(hall => {
@@ -676,7 +680,7 @@ function renderWeek() {
       if (!gridHours.length) return; anyGrid = true;
       const overlay = {};
       DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= capOf(s); for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
-      const blk = document.createElement('div'); blk.className = 'free-block';
+      const blk = document.createElement('div'); blk.className = 'free-block'; blk.style.setProperty('--hall', hallColor(hall));
       blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
       const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
       grid.innerHTML = '<span></span>' + Array.from({ length: hall.courts }, (_, c) => `<span class="cg-p">P${c + 1}</span>`).join('');
