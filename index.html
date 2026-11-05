@@ -675,11 +675,11 @@ function renderSlot(s, isPast) {
   else st.innerHTML = `<span>${players.length} von ${MAX_PLAYERS}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
-  if (!isPast && !cancelled) {
+  if (!isPast && !cancelled && canOrganize()) {
     const cb = document.createElement('button'); cb.type = 'button'; cb.className = 'linkbtn sm'; cb.textContent = 'Termin absagen';
     cb.addEventListener('click', () => cancelSlot(s)); el.append(cb);
   }
-  if (!isPast && cancelled && (canOrganize() || s.cancelled_by === me.id)) {
+  if (!isPast && cancelled && canOrganize()) {
     const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'linkbtn sm'; rb.textContent = 'Absage zurücknehmen';
     rb.addEventListener('click', () => restoreSlot(s)); el.append(rb);
   }
