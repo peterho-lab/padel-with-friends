@@ -114,6 +114,11 @@ input[type=email], input[type=text], input[type=time], select {
 .avail .dot:first-child { margin-left: 0; }
 .avail-btn { border: 2px dashed var(--line); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 4px 10px; font-size: .8rem; font-weight: 700; }
 .avail-btn.on { background: var(--ball-soft); border-style: solid; border-color: var(--ball); color: var(--ink); }
+.avail .dot { position: relative; }
+.avail .dot .part { position: absolute; right: -5px; bottom: -5px; width: 13px; height: 13px; border-radius: 50%; background: var(--ink); color: var(--court); font-size: .5rem; font-weight: 800; display: grid; place-items: center; border: 1.5px solid var(--card); }
+.avail-pick { display: flex; gap: 6px; flex-wrap: wrap; }
+.avail-pick button { border: 2px solid var(--ball); background: var(--ball-soft); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: .8rem; font-weight: 700; }
+.avail-pick button.ghost { border-color: var(--line); background: transparent; color: var(--ink-soft); }
 
 .free-block { display: grid; gap: 6px; }
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
@@ -367,6 +372,7 @@ let COURT_NAME = 'EUROPAHALLE';
 const MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+const PART_LABEL = { all: 'Ich hätte Zeit', am: 'Vormittag', pm: 'Nachmittag' };
 const WD_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const MON = ['Jän','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
 
@@ -599,16 +605,25 @@ function renderWeek() {
     col.className = 'day' + (isToday ? ' today' : '') + (isPast ? ' past' : '') + (isPast && !slots.length ? ' past-empty' : '');
     col.innerHTML = `<div class="day-head"><h3>${isToday ? 'Heute' : WD[i]}</h3><span class="date">${WD_SHORT[i]} ${d.getDate()}. ${MON[d.getMonth()]}</span></div>`;
 
-    const av = DB.avail.filter(a => a.date === key).map(a => a.player_id);
+    const avRows = DB.avail.filter(a => a.date === key), av = avRows.map(a => a.player_id);
     if (!isPast || av.length) {
       const avRow = document.createElement('div'); avRow.className = 'avail';
       const dots = document.createElement('span'); dots.className = 'dots';
-      av.map(person).filter(Boolean).forEach(p => dots.append(dot(p))); avRow.append(dots);
+      avRows.forEach(a => { const p = person(a.player_id); if (!p) return; const d = dot(p); const part = a.part || 'all'; if (part !== 'all') { const t = document.createElement('span'); t.className = 'part'; t.textContent = part === 'am' ? 'V' : 'N'; d.append(t); } d.title = `${p.name}: ${PART_LABEL[part]}`; dots.append(d); });
+      avRow.append(dots);
       if (!isPast) {
-        const mine = av.includes(me.id);
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'avail-btn' + (mine ? ' on' : '');
-        b.textContent = mine ? '✓ Ich hätte Zeit' : (av.length ? `+ ${av.length} hätten Zeit` : '+ Ich hätte Zeit');
-        b.addEventListener('click', () => toggleAvail(key, mine)); avRow.append(b);
+        const mineRow = avRows.find(a => a.player_id === me.id);
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'avail-btn' + (mineRow ? ' on' : '');
+        b.textContent = mineRow ? `✓ ${PART_LABEL[mineRow.part || 'all']}` : (av.length ? `+ ${av.length} hätten Zeit` : '+ Ich hätte Zeit');
+        b.title = mineRow ? 'Tippen zum Zurücknehmen' : 'Tippen und Zeitraum wählen';
+        b.addEventListener('click', () => {
+          if (mineRow) return toggleAvail(key, true);
+          const pick = document.createElement('span'); pick.className = 'avail-pick';
+          [['all', 'Ganzer Tag'], ['am', 'Vormittag'], ['pm', 'Nachmittag']].forEach(([v, l]) => { const o = document.createElement('button'); o.type = 'button'; o.textContent = l; o.addEventListener('click', () => toggleAvail(key, false, v)); pick.append(o); });
+          const x = document.createElement('button'); x.type = 'button'; x.className = 'ghost'; x.textContent = '×'; x.addEventListener('click', () => pick.replaceWith(b)); pick.append(x);
+          b.replaceWith(pick);
+        });
+        avRow.append(b);
       }
       col.append(avRow);
     }
@@ -795,10 +810,15 @@ $('#pick-guest').addEventListener('submit', async e => {
 $('#pick-close').addEventListener('click', () => { $('#pick-modal').hidden = true; });
 $('#pick-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#pick-modal').hidden = true; });
 
-async function toggleAvail(key, mine) {
+async function toggleAvail(key, mine, part) {
   try {
-    const q = mine ? sb.from('availability').delete().eq('group_id', G.id).eq('date', key).eq('player_id', me.id) : sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id });
-    const { error } = await q; if (error) throw error; await reload();
+    if (mine) { const { error } = await sb.from('availability').delete().eq('group_id', G.id).eq('date', key).eq('player_id', me.id); if (error) throw error; }
+    else {
+      let { error } = await sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id, part: part || 'all' });
+      if (error && /part/.test(error.message || '')) ({ error } = await sb.from('availability').insert({ group_id: G.id, date: key, player_id: me.id }));   // Datenbank noch ohne Spalte part
+      if (error) throw error;
+    }
+    await reload();
   } catch (e) { fail(e, 'Speichern'); }
 }
 async function saveGrid(hallId, key, grid) {
