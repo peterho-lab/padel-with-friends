@@ -153,6 +153,12 @@ input[type=email], input[type=text], input[type=time], select {
 .status .pill { background: var(--ball); color: #173A14; border-radius: 999px; padding: 3px 10px 3px 6px; font-weight: 700; font-family: var(--font-display); font-size: .8rem; display: inline-flex; align-items: center; gap: 4px; }
 .status .pill img { height: 18px; width: auto; }
 .wait { font-size: .8rem; color: var(--ink-soft); }
+.slot.cancelled { border-color: var(--line); background: var(--court); opacity: .75; }
+.slot.cancelled .time { text-decoration: line-through; }
+.slot.cancelled .court { background: var(--line); color: var(--ink-soft); }
+.slot.cancelled .seat { filter: grayscale(1); opacity: .5; }
+.cancel-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--danger); color: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: .8rem; }
+.slot .linkbtn.sm { font-size: .8rem; padding: 2px 0; justify-self: start; }
 .del { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--danger); color: #fff; font-weight: 700; line-height: 1; display: none; padding: 0; }
 .admin .del { display: grid; place-items: center; }
 .add-slot { display: none; border: 2px dashed var(--court-deep); background: transparent; color: var(--ink-soft); border-radius: 14px; padding: 10px; font-weight: 700; }
@@ -596,7 +602,7 @@ function renderWeek() {
       const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && !/^\.+$/.test(cg[hh])).sort((a, b) => a - b);
       if (!gridHours.length) return; anyGrid = true;
       const overlay = {};
-      DB.slots.filter(s => s.date === key && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
+      DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
       const blk = document.createElement('div'); blk.className = 'free-block';
       blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
       const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
@@ -629,7 +635,8 @@ function endTime(time, dur) { const [h, m] = time.split(':').map(Number); const 
 function renderSlot(s, isPast) {
   const players = slotPlayers(s), wait = slotWait(s);
   const full = players.length >= MAX_PLAYERS, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
-  const el = document.createElement('article'); el.className = 'slot' + (full ? ' full' : '') + (mine ? ' mine' : '');
+  const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
+  const el = document.createElement('article'); el.className = 'slot' + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
   el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><span class="court">${s.court}</span></div>`;
   const seats = document.createElement('div'); seats.className = 'seats';
   for (let i = 0; i < MAX_PLAYERS; i++) {
@@ -641,17 +648,26 @@ function renderSlot(s, isPast) {
       b.style.background = p.regular && p.color ? p.color : 'var(--guest)'; b.textContent = sh;
       b.title = p.id === me.id ? 'Du. Tippen zum Austragen.' : p.name + (p.regular ? '' : ' (Gast)');
     } else { b.className = 'seat empty'; b.textContent = '+'; b.title = 'Freier Platz. Tippen zum Eintragen.'; }
-    if (isPast) b.disabled = true;
+    if (isPast || cancelled) b.disabled = true;
     b.addEventListener('click', () => seatClick(s, su)); seats.append(b);
   }
   el.append(seats);
   const open = MAX_PLAYERS - players.length, st = document.createElement('div'); st.className = 'status';
-  if (full) st.innerHTML = `<span>${mine ? 'Du bist dabei' : 'Platz ist voll'}</span><span class="pill"><img src="assets/ball.png" alt="">Match steht</span>`;
+  if (cancelled) st.innerHTML = `<span class="cancel-pill">Abgesagt</span><span>von ${canceller ? canceller.name : '?'}</span>`;
+  else if (full) st.innerHTML = `<span>${mine ? 'Du bist dabei' : 'Platz ist voll'}</span><span class="pill"><img src="assets/ball.png" alt="">Match steht</span>`;
   else if (mine) st.innerHTML = `<span>Du bist dabei</span><span>noch ${open} gesucht</span>`;
   else st.innerHTML = `<span>${players.length} von ${MAX_PLAYERS}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
-  if (full && !mine && !isPast) {
+  if (!isPast && !cancelled) {
+    const cb = document.createElement('button'); cb.type = 'button'; cb.className = 'linkbtn sm'; cb.textContent = 'Termin absagen';
+    cb.addEventListener('click', () => cancelSlot(s)); el.append(cb);
+  }
+  if (!isPast && cancelled && (canOrganize() || s.cancelled_by === me.id)) {
+    const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'linkbtn sm'; rb.textContent = 'Absage zurücknehmen';
+    rb.addEventListener('click', () => restoreSlot(s)); el.append(rb);
+  }
+  if (full && !mine && !isPast && !cancelled) {
     const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'btn btn-ghost btn-small';
     wb.textContent = onWait ? 'Von der Warteliste streichen' : 'Auf die Warteliste'; wb.addEventListener('click', () => toggleSlot(s)); el.append(wb);
   }
@@ -747,6 +763,31 @@ async function claimFree(key, hall, hh, c) {
     let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(hall.id, key, g);
     toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
   } catch (e) { fail(e, 'Slot anlegen'); }
+}
+async function cancelSlot(s) {
+  if (!confirm(`Termin ${s.time} absagen? Alle im Team sehen ihn dann als abgesagt.`)) return;
+  try {
+    const { error } = await sb.from('slots').update({ cancelled_at: new Date().toISOString(), cancelled_by: me.id }).eq('id', s.id); if (error) throw error;
+    const row = s.hall_id ? DB.grids[gridKey(s.hall_id, s.date)] : null;
+    if (row && s.court_idx !== null && s.court_idx !== undefined) {
+      let g = row.grid; const h0 = hourOf(s.time);
+      for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh] && g[hh][s.court_idx] === 'M') g = withCell(g, hh, s.court_idx, 'o');
+      await saveGrid(s.hall_id, s.date, g);
+    }
+    toast('Termin abgesagt.'); await reload();
+  } catch (e) { fail(e, 'Absagen'); }
+}
+async function restoreSlot(s) {
+  try {
+    const { error } = await sb.from('slots').update({ cancelled_at: null, cancelled_by: null }).eq('id', s.id); if (error) throw error;
+    const row = s.hall_id ? DB.grids[gridKey(s.hall_id, s.date)] : null;
+    if (row && s.court_idx !== null && s.court_idx !== undefined) {
+      let g = row.grid; const h0 = hourOf(s.time);
+      for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh]) g = withCell(g, hh, s.court_idx, 'M');
+      await saveGrid(s.hall_id, s.date, g);
+    }
+    toast('Termin findet wieder statt.'); await reload();
+  } catch (e) { fail(e, 'Wiederherstellen'); }
 }
 async function deleteSlot(s) {
   try {
@@ -992,7 +1033,7 @@ $('#imp-apply').addEventListener('click', async () => {
       for (let cc = 0; cc < imp.courts; cc++) { const st = imp.cells[`${dIdx},${r},${cc}`]; row += st; if (st === 'o' && inWindow(dIdx, hour)) n++; }
       day[hour] = row;
     }
-    DB.slots.filter(s => s.date === key && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
+    DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
     rows.push({ group_id: G.id, hall_id: hall.id, date: key, court: hall.name, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
   }
   try {
