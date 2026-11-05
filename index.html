@@ -158,6 +158,11 @@ input[type=email], input[type=text], input[type=time], select {
 .slot.full .court { background: var(--card); color: var(--ink); }
 .slot-right { display: grid; justify-items: end; gap: 4px; max-width: 55%; }
 .slot-right .court { max-width: 100%; }
+.reserved-row { display: flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 700; color: var(--ink-soft); }
+.reserved-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.reserved-row.on { color: var(--ink); }
+.reserved-row.on::before { content: "✓"; color: var(--accent); font-weight: 800; }
+.reserved-row input:disabled { opacity: .5; }
 .slot .court.editable { cursor: pointer; }
 .slot .court.editable:hover { filter: brightness(.93); }
 .hall-edit { display: grid; gap: 6px; justify-items: stretch; width: 100%; }
@@ -755,6 +760,12 @@ function renderSlot(s, isPast) {
     const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'btn btn-ghost btn-small';
     wb.textContent = onWait ? 'Von der Warteliste streichen' : 'Auf die Warteliste'; wb.addEventListener('click', () => toggleSlot(s)); el.append(wb);
   }
+  if (!cancelled) {
+    const rr = document.createElement('label'); rr.className = 'reserved-row' + (s.reserved ? ' on' : '');
+    const canEdit = !isPast && (canOrganize() || s.created_by === me.id);
+    if (canEdit) { const cbx = document.createElement('input'); cbx.type = 'checkbox'; cbx.checked = !!s.reserved; cbx.addEventListener('change', () => setReserved(s, cbx.checked)); rr.append(cbx); }
+    rr.append(document.createTextNode(s.reserved ? 'Platz ist fix reserviert' : 'Platz noch nicht reserviert')); el.append(rr);
+  }
   if (DB.commentsOk) el.append(renderComments(s, isPast));
   const del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.title = 'Slot löschen';
   del.addEventListener('click', () => deleteSlot(s)); el.append(del);
@@ -912,6 +923,10 @@ async function moveSlot(s, hall, court_idx) {
     if (newRow && court_idx !== null) { let g = newRow.grid; const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh]) g = withCell(g, hh, court_idx, 'M'); await saveGrid(hall.id, s.date, g); }
     toast(`Termin jetzt in ${court}.`); await reload();
   } catch (e) { fail(e, 'Halle ändern'); }
+}
+async function setReserved(s, on) {
+  try { const { error } = await sb.from('slots').update({ reserved: on }).eq('id', s.id); if (error) throw error; toast(on ? 'Platz als fix reserviert markiert.' : 'Markierung entfernt.'); await reload(); }
+  catch (e) { fail(e, 'Reserviert-Haken'); }
 }
 async function cancelSlot(s) {
   if (!confirm(`Termin ${s.time} absagen? Alle im Team sehen ihn dann als abgesagt.`)) return;
