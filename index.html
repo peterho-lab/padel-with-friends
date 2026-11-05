@@ -126,10 +126,11 @@ input[type=email], input[type=text], input[type=time], select {
 
 .free-block { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: color-mix(in srgb, var(--hall, var(--accent)) 14%, var(--card)); border-left: 4px solid var(--hall, var(--accent)); }
 .free-label { color: var(--ink); }
-.hall-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.hall-tab { border: 2px solid var(--line); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.hall-tab.on { border-color: var(--hall, var(--accent)); background: var(--hall, var(--accent)); color: #fff; }
-.hall-tab.nogrid { border-style: dashed; }
+.hall-pick { position: relative; display: inline-flex; align-items: center; max-width: 100%; }
+.hall-pick select { appearance: none; -webkit-appearance: none; border: 2px solid var(--hall, var(--accent)); background: var(--hall, var(--accent)); color: #fff; border-radius: 999px; padding: 4px 28px 4px 12px; font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; max-width: 100%; text-overflow: ellipsis; }
+.hall-pick select:focus { outline: 3px solid color-mix(in srgb, var(--hall, var(--accent)) 35%, transparent); outline-offset: 2px; }
+.hall-pick::after { content: ''; position: absolute; right: 11px; top: 50%; width: 7px; height: 7px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.hall-pick select option { color: var(--ink); background: var(--card); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
 .free-label img { height: 14px; width: auto; }
 .cg { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: .72rem; }
@@ -679,9 +680,11 @@ function renderWeek() {
       const withGrid = halls.filter(h => DB.grids[gridKey(h.id, key)]);
       let pick = hallById(dayHall[key]); if (!pick || !halls.includes(pick)) pick = withGrid[0] || halls[0];
       dayHalls = [pick];
-      const tabs = document.createElement('div'); tabs.className = 'hall-tabs';
-      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.style.setProperty('--hall', hallColor(h)); b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; renderWeek(); }); tabs.append(b); });
-      col.append(tabs);
+      const wrap = document.createElement('div'); wrap.className = 'hall-pick'; wrap.style.setProperty('--hall', hallColor(pick));
+      const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Halle für diesen Tag');
+      halls.forEach(h => { const o = document.createElement('option'); o.value = h.id; o.textContent = h.name + (DB.grids[gridKey(h.id, key)] ? '' : ' (keine Belegung)'); o.selected = h.id === pick.id; sel.append(o); });
+      sel.addEventListener('change', () => { dayHall[key] = sel.value; renderWeek(); });
+      wrap.append(sel); col.append(wrap);
     }
     dayHalls.forEach(hall => {
       const cg = (DB.grids[gridKey(hall.id, key)] || {}).grid || {};
