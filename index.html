@@ -203,6 +203,8 @@ input[type=email], input[type=text], input[type=time], select {
 .slot.cancelled .seat { filter: grayscale(1); opacity: .5; }
 .cancel-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--danger); color: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: .8rem; }
 .slot .linkbtn.sm { font-size: .8rem; padding: 2px 0; justify-self: start; }
+.slot .dateline { font-size: .8rem; font-weight: 700; color: var(--ink-soft); letter-spacing: .02em; }
+.slot.cancelled .dateline { text-decoration: line-through; }
 .comments { display: grid; gap: 6px; border-top: 1px dashed var(--line); padding-top: 8px; }
 .comment { display: flex; gap: 8px; align-items: flex-start; font-size: .85rem; line-height: 1.35; }
 .comment .dot { width: 22px; height: 22px; font-size: .62rem; margin-top: 1px; }
@@ -411,6 +413,8 @@ const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Son
 const PART_LABEL = { all: 'Ich hätte Zeit', am: 'Vormittag', pm: 'Nachmittag' };
 const WD_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const MON = ['Jän','Feb','März','Apr','Mai','Juni','Juli','Aug','Sep','Okt','Nov','Dez'];
+const MON_LONG = ['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const longDate = key => { const d = new Date(key + 'T12:00:00'); return `${WD[(d.getDay() + 6) % 7]}, ${d.getDate()}. ${MON_LONG[d.getMonth()]}`; };
 
 // ======================= Datum =======================
 const pad = n => String(n).padStart(2, '0');
@@ -760,10 +764,7 @@ function renderSlot(s, isPast) {
   else st.innerHTML = `<span>${players.length} von ${cap}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
-  if (!isPast && !cancelled && canOrganize()) {
-    const cb = document.createElement('button'); cb.type = 'button'; cb.className = 'linkbtn sm'; cb.textContent = 'Termin absagen';
-    cb.addEventListener('click', () => cancelSlot(s)); el.append(cb);
-  }
+  const dl = document.createElement('div'); dl.className = 'dateline'; dl.textContent = longDate(s.date); el.append(dl);
   if (!isPast && cancelled && canOrganize()) {
     const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'linkbtn sm'; rb.textContent = 'Absage zurücknehmen';
     rb.addEventListener('click', () => restoreSlot(s)); el.append(rb);
@@ -950,7 +951,9 @@ function timeEditor(s, host) {
   const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-small'; ok.textContent = 'Speichern';
   const no = document.createElement('button'); no.type = 'button'; no.className = 'btn btn-ghost btn-small'; no.textContent = 'Abbrechen'; no.addEventListener('click', () => renderWeek());
   ok.addEventListener('click', () => { if (!ti.value) { toast('Uhrzeit fehlt.'); return; } updateSlot(s, { time: ti.value, dur }, `Termin jetzt ${ti.value} bis ${endTime(ti.value, dur)}.`, 'Zeit ändern'); });
-  row.append(ok, no); box.append(ti, dp, row); host.replaceWith(box);
+  row.append(ok, no); box.append(ti, dp, row);
+  if (canOrganize()) { const cb = document.createElement('button'); cb.type = 'button'; cb.className = 'linkbtn sm'; cb.textContent = 'Termin absagen'; cb.addEventListener('click', () => cancelSlot(s)); box.append(cb); }
+  host.replaceWith(box);
 }
 function moveSlot(s, hall, court_idx) {
   if (!hall) return;
