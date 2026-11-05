@@ -893,9 +893,9 @@ function slotForm(dateKey) {
     <label for="c-${uid}">Halle</label><select id="c-${uid}">${teamHalls().map(h => `<option value="${h.id}">${h.name}</option>`).join('')}<option value="">andere</option></select>
     <input type="text" id="cn-${uid}" placeholder="Name der Halle" hidden>
     <label for="p-${uid}">Platz</label><select id="p-${uid}"></select>
-    ${canOrganize() ? `<label class="toggle"><input type="checkbox" id="tr-${uid}"> Turnier (fixer Termin, eigene Teamgröße)</label>
+    ${canOrganize() ? `<label class="toggle"><input type="checkbox" id="tr-${uid}"> Turnier (fixer Termin, unser Team z. B. 2 Spieler)</label>
     <div id="trf-${uid}" hidden><label for="tt-${uid}">Turniername</label><input type="text" id="tt-${uid}" placeholder="z. B. Vereinsturnier Graz" maxlength="60">
-    <label for="tm-${uid}">Teamgröße</label><input type="number" id="tm-${uid}" min="1" max="40" value="8"></div>` : ''}
+    <label for="tm-${uid}">Teamgröße</label><input type="number" id="tm-${uid}" min="1" max="40" value="2"></div>` : ''}
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
@@ -908,7 +908,7 @@ function slotForm(dateKey) {
     if (!time || !hall) { toast('Halle fehlt.'); return; }
     const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
     const rec = { group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id };
-    if (trCb && trCb.checked) { rec.kind = 'tournament'; rec.title = f.querySelector(`#tt-${uid}`).value.trim() || 'Turnier'; rec.max_players = Math.max(1, Math.min(40, +f.querySelector(`#tm-${uid}`).value || 8)); }
+    if (trCb && trCb.checked) { rec.kind = 'tournament'; rec.title = f.querySelector(`#tt-${uid}`).value.trim() || 'Turnier'; rec.max_players = Math.max(1, Math.min(40, +f.querySelector(`#tm-${uid}`).value || 2)); }
     const { data: slot, error } = await sb.from('slots').insert(rec).select().single();
     if (error) { fail(error, 'Slot anlegen'); return; }
     const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) { fail(e2, 'Eintragen'); }
