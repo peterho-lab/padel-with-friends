@@ -664,10 +664,10 @@ function renderWeek() {
     let dayHalls = halls;
     if (halls.length > 1 && !isPast) {
       const withGrid = halls.filter(h => DB.grids[gridKey(h.id, key)]);
-      let pick = hallById(dayHall[key] || LS.get('pwf-hall-' + G.id)) ; if (!pick || !halls.includes(pick)) pick = withGrid[0] || halls[0];
+      let pick = hallById(dayHall[key]); if (!pick || !halls.includes(pick)) pick = withGrid[0] || halls[0];
       dayHalls = [pick];
       const tabs = document.createElement('div'); tabs.className = 'hall-tabs';
-      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; LS.set('pwf-hall-' + G.id, h.id); renderWeek(); }); tabs.append(b); });
+      halls.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hall-tab' + (h.id === pick.id ? ' on' : '') + (DB.grids[gridKey(h.id, key)] ? '' : ' nogrid'); b.textContent = h.name; b.title = DB.grids[gridKey(h.id, key)] ? `${h.name} anzeigen` : `${h.name}: noch keine Belegung importiert`; b.addEventListener('click', () => { dayHall[key] = h.id; renderWeek(); }); tabs.append(b); });
       col.append(tabs);
     }
     dayHalls.forEach(hall => {
@@ -929,7 +929,7 @@ function slotForm(dateKey) {
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
-  const pre = dayHall[dateKey] || LS.get('pwf-hall-' + G.id); if (pre && hallById(pre)) hallSel.value = pre;
+  const pre = dayHall[dateKey]; if (pre && hallById(pre)) hallSel.value = pre;
   const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
   hallSel.addEventListener('change', fillPlaces); fillPlaces();
   const trCb = f.querySelector(`#tr-${uid}`); if (trCb) trCb.addEventListener('change', () => { f.querySelector(`#trf-${uid}`).hidden = !trCb.checked; });
