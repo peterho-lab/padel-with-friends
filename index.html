@@ -118,6 +118,9 @@ input[type=email], input[type=text], input[type=time], select {
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
 .free-label img { height: 14px; width: auto; }
 .cg { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: .72rem; }
+.hall-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
+.hall-row input[type="text"] { padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; min-width: 0; }
+.hall-row input[type="number"] { width: 64px; padding: 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
 .cg-h { color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; padding-right: 4px; }
 .cg-p { text-align: center; color: var(--ink-soft); font-weight: 700; font-size: .65rem; }
 .cg-cell { height: 22px; border-radius: 5px; border: 0; padding: 0; background: var(--cg-grey); cursor: default; }
@@ -255,6 +258,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div class="admin-tools">
       <button class="btn btn-ball btn-small" id="import-btn" type="button">Screenshot importieren</button>
       <button class="btn btn-ghost btn-small" id="players-btn" type="button">Spieler verwalten</button>
+      <button class="btn btn-ghost btn-small" id="halls-btn" type="button">Hallen</button>
     </div>
     <div class="legend" id="legend"></div>
     <div class="grid-meta" id="grid-meta"></div>
@@ -267,9 +271,10 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <!-- Import-Dialog -->
 <div class="modal" id="import-modal" hidden>
   <div class="modal-card">
-    <div class="slot-top"><h2>Platzbelegung EUROPAHALLE importieren</h2><button class="linkbtn" id="imp-close" type="button">Schließen</button></div>
+    <div class="slot-top"><h2>Platzbelegung importieren</h2><button class="linkbtn" id="imp-close" type="button">Schließen</button></div>
     <p>Screenshot des Wochenplans Montag bis Sonntag aus dem Buchungssystem. Blau gilt als gebucht, Hellgrün als frei, Grau als nicht buchbar.</p>
     <div class="imp-grid">
+      <div class="field"><label for="imp-hall">Halle</label><select id="imp-hall"></select></div>
       <div class="field"><label for="imp-week">Woche</label><select id="imp-week"></select></div>
       <div class="field"><label for="imp-first">Erste Zeile</label><input type="time" id="imp-first" value="07:00"></div>
       <div class="field"><label for="imp-last">Letzte Zeile</label><input type="time" id="imp-last" value="22:00"></div>
@@ -294,6 +299,18 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div class="pick-list" id="pick-list"></div>
     <form class="pick-guest" id="pick-guest"><label for="pick-guest-name">Neuer Gast</label><div class="row"><input type="text" id="pick-guest-name" placeholder="Name" maxlength="30" autocomplete="off"><button class="btn btn-primary btn-small" type="submit">Eintragen</button></div></form>
     <div class="row"><button class="btn btn-ghost btn-small" id="pick-close" type="button">Abbrechen</button></div>
+  </div>
+</div>
+
+<div class="modal" id="halls-modal" hidden>
+  <div class="modal-card pick-card">
+    <div class="slot-top"><h2 id="halls-title">Hallen</h2><button class="linkbtn" id="halls-close" type="button">Schließen</button></div>
+    <p>Haken = das Team spielt dort. Pro Halle die Anzahl der Plätze, die im Buchungsplan nebeneinander stehen.</p>
+    <div class="pick-list" id="halls-list"></div>
+    <form class="pick-guest" id="hall-new">
+      <label for="hall-new-name">Neue Halle</label>
+      <div class="row"><input type="text" id="hall-new-name" placeholder="Name, z. B. PADELBASE" maxlength="40" autocomplete="off" style="flex:1;min-width:0"><input type="number" id="hall-new-courts" min="1" max="12" value="3" title="Plätze" style="width:64px"><button class="btn btn-primary btn-small" type="submit">Anlegen</button></div>
+    </form>
   </div>
 </div>
 
@@ -328,8 +345,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <script>
 // ======================= Konstanten =======================
 let COURT_NAME = 'EUROPAHALLE';
-const COURTS_PER_DAY = 3, MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
-const COURTS = ['EUROPAHALLE', 'PADELBASE', 'SPORTPARK'];
+const MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
 const WD_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -350,7 +366,7 @@ const rangeFrom = iso(thisMonday), rangeTo = iso(addDays(thisMonday, 7 * (MAX_WE
 const CFG = window.PWF_CONFIG || {};
 const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') && CFG.supabaseAnonKey && CFG.supabaseAnonKey !== 'DEIN-ANON-KEY';
 const sb = configured ? supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
-const DB = { players: [], groups: [], memberships: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
+const DB = { players: [], groups: [], memberships: [], halls: [], groupHalls: [], slots: [], avail: [], grids: {}, window: { wd: 17, we: 9 } };
 let me = null, G = null, weekOffset = 0, adminMode = false, loaded = false;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
 
@@ -369,6 +385,9 @@ const myRole = () => G && me ? (DB.memberships.find(m => m.group_id === G.id && 
 const canOrganize = () => !!me && (!!me.admin || myRole() === 'organizer');
 const myGroups = () => me ? (me.admin ? DB.groups : DB.groups.filter(g => DB.memberships.some(m => m.group_id === g.id && m.player_id === me.id))) : [];
 const groupOrganizers = g => membersOf(g).filter(m => m.role === 'organizer').map(m => person(m.player_id)).filter(Boolean);
+const hallById = id => DB.halls.find(h => h.id === id);
+const teamHalls = () => { if (!G) return []; const ids = new Set(DB.groupHalls.filter(x => x.group_id === G.id).map(x => x.hall_id)); return DB.halls.filter(h => ids.has(h.id)); };
+const gridKey = (hallId, date) => `${hallId}|${date}`;
 const shortOf = p => p.short || p.name.slice(0, 2);
 const slotPlayers = s => (s.signups || []).filter(x => x.kind === 'player').sort((a, b) => a.created_at.localeCompare(b.created_at));
 const slotWait = s => (s.signups || []).filter(x => x.kind === 'wait').sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -380,13 +399,15 @@ function dot(p, cls) {
 
 // ======================= Laden =======================
 async function loadBase() {
-  const [p, g, m] = await Promise.all([
+  const [p, g, m, h, gh] = await Promise.all([
     sb.from('players').select('*').order('created_at'),
     sb.from('groups').select('*').order('name'),
     sb.from('memberships').select('*'),
+    sb.from('halls').select('*').order('name'),
+    sb.from('group_halls').select('*'),
   ]);
-  const err = [p, g, m].find(r => r.error); if (err) throw err.error;
-  DB.players = p.data; DB.groups = g.data; DB.memberships = m.data;
+  const err = [p, g, m, h, gh].find(r => r.error); if (err) throw err.error;
+  DB.players = p.data; DB.groups = g.data; DB.memberships = m.data; DB.halls = h.data; DB.groupHalls = gh.data;
   if (G) { G = DB.groups.find(x => x.id === G.id) || null; applyGroup(); }
   loaded = true;
 }
@@ -398,9 +419,9 @@ async function loadGroup() {
     sb.from('availability').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
   ]);
   const err = [s, g, a].find(r => r.error); if (err) throw err.error;
-  DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [r.date, r]));
+  DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [gridKey(r.hall_id, r.date), r]));
 }
-function applyGroup() { if (!G) return; COURT_NAME = G.hall || 'EUROPAHALLE'; DB.window = G.view_window || { wd: 17, we: 9 }; }
+function applyGroup() { if (!G) return; const th = teamHalls(); COURT_NAME = th.length ? th[0].name : (G.hall || 'EUROPAHALLE'); DB.window = G.view_window || { wd: 17, we: 9 }; }
 async function loadAll() { await loadBase(); await loadGroup(); }
 let reloadT;
 function scheduleReload() { clearTimeout(reloadT); reloadT = setTimeout(reload, 250); }
@@ -529,7 +550,7 @@ function renderLegend() {
   members().filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', p.name));
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
-  add(bottom, 'var(--free)', `${COURT_NAME} frei`, true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
+  add(bottom, 'var(--free)', 'Halle frei', true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
 }
 
 // ======================= Woche =======================
@@ -543,9 +564,9 @@ function renderWeek() {
   const label = weekOffset === 0 ? 'Diese Woche' : weekOffset === 1 ? 'Nächste Woche' : `In ${weekOffset} Wochen`;
   $('#week-title').innerHTML = `${label}<span class="sub">KW ${isoWeek(mon)} · ${range}</span>`;
   $('#prev').disabled = weekOffset === 0; $('#next').disabled = weekOffset === MAX_WEEKS_AHEAD;
-  const weekGrids = Array.from({ length: 7 }, (_, i) => DB.grids[iso(addDays(mon, i))]).filter(Boolean);
   const fmt = t => { const d = new Date(t); return `${d.getDate()}. ${MON[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-  $('#grid-meta').innerHTML = weekGrids.length ? `${COURT_NAME}-Belegung importiert am <b>${fmt(weekGrids[0].imported_at)}</b>` : `${COURT_NAME}: <b>noch kein Screenshot importiert</b>`;
+  const halls = teamHalls();
+  $('#grid-meta').innerHTML = halls.length ? halls.map(h => { const wg = Array.from({ length: 7 }, (_, i) => DB.grids[gridKey(h.id, iso(addDays(mon, i)))]).filter(Boolean); return wg.length ? `${h.name}: Belegung importiert am <b>${fmt(wg[0].imported_at)}</b>` : `${h.name}: <b>noch kein Screenshot importiert</b>`; }).join(' · ') : 'Noch keine Halle im Team. <b>Hallen</b> im Organisator-Modus wählen.';
 
   const wrap = $('#days'); wrap.innerHTML = '';
   for (let i = 0; i < 7; i++) {
@@ -569,29 +590,31 @@ function renderWeek() {
       col.append(avRow);
     }
 
-    const cg = (DB.grids[key] || {}).grid || {}, winStart = i < 5 ? DB.window.wd : DB.window.we;
-    const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && cg[hh] !== '...').sort((a, b) => a - b);
-    const overlay = {};
-    DB.slots.filter(s => s.date === key && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
-    if (gridHours.length) {
+    const winStart = i < 5 ? DB.window.wd : DB.window.we; let anyGrid = false;
+    halls.forEach(hall => {
+      const cg = (DB.grids[gridKey(hall.id, key)] || {}).grid || {};
+      const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && !/^\.+$/.test(cg[hh])).sort((a, b) => a - b);
+      if (!gridHours.length) return; anyGrid = true;
+      const overlay = {};
+      DB.slots.filter(s => s.date === key && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
       const blk = document.createElement('div'); blk.className = 'free-block';
-      blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${COURT_NAME}</div>`;
-      const grid = document.createElement('div'); grid.className = 'cg';
-      grid.innerHTML = '<span></span><span class="cg-p">P1</span><span class="cg-p">P2</span><span class="cg-p">P3</span>';
+      blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
+      const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
+      grid.innerHTML = '<span></span>' + Array.from({ length: hall.courts }, (_, c) => `<span class="cg-p">P${c + 1}</span>`).join('');
       gridHours.forEach(hh => {
         const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${hh}–${hh + 1}`; lab.title = `${pad(hh)}:00 bis ${pad(hh + 1)}:00`; grid.append(lab);
-        for (let c = 0; c < COURTS_PER_DAY; c++) {
-          const ov = overlay[`${hh},${c}`], st = ov ? 'M' : cg[hh][c], b = document.createElement('button'); b.type = 'button';
+        for (let c = 0; c < hall.courts; c++) {
+          const ov = overlay[`${hh},${c}`], st = ov ? 'M' : (cg[hh][c] || '.'), b = document.createElement('button'); b.type = 'button';
           b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '');
-          b.title = st === 'o' ? `Platz ${c + 1}, ${hh}–${hh + 1} Uhr frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Europahalle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
-          if (st === 'o') b.addEventListener('click', () => claimFree(key, hh, c)); else b.disabled = true;
+          b.title = st === 'o' ? `${hall.name}, Platz ${c + 1}, ${hh}–${hh + 1} Uhr frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Halle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
+          if (st === 'o') b.addEventListener('click', () => claimFree(key, hall, hh, c)); else b.disabled = true;
           grid.append(b);
         }
       });
       blk.append(grid); col.append(blk);
-    }
+    });
 
-    if (!slots.length && !gridHours.length && !isPast) { const e = document.createElement('div'); e.className = 'empty-day'; e.innerHTML = '<img src="assets/ball-dots.png" alt=""><span>Noch kein Platz reserviert</span>'; col.append(e); }
+    if (!slots.length && !anyGrid && !isPast) { const e = document.createElement('div'); e.className = 'empty-day'; e.innerHTML = '<img src="assets/ball-dots.png" alt=""><span>Noch kein Platz reserviert</span>'; col.append(e); }
     slots.forEach(s => col.append(renderSlot(s, isPast)));
     if (!isPast) {
       const add = document.createElement('button'); add.type = 'button'; add.className = 'add-slot'; add.textContent = '+ Slot anlegen';
@@ -710,29 +733,29 @@ async function toggleAvail(key, mine) {
     const { error } = await q; if (error) throw error; await reload();
   } catch (e) { fail(e, 'Speichern'); }
 }
-async function saveGrid(key, grid) {
-  const row = DB.grids[key]; if (!row) return;
-  const { error } = await sb.from('court_grid').update({ grid }).eq('group_id', G.id).eq('date', key); if (error) throw error;
+async function saveGrid(hallId, key, grid) {
+  const row = DB.grids[gridKey(hallId, key)]; if (!row) return;
+  const { error } = await sb.from('court_grid').update({ grid }).eq('group_id', G.id).eq('hall_id', hallId).eq('date', key); if (error) throw error;
 }
 function withCell(grid, hh, c, st) { const g = { ...grid }; if (g[hh]) g[hh] = g[hh].slice(0, c) + st + g[hh].slice(c + 1); return g; }
-async function claimFree(key, hh, c) {
-  const row = DB.grids[key]; if (!row || !row.grid[hh] || row.grid[hh][c] !== 'o') return;
+async function claimFree(key, hall, hh, c) {
+  const row = DB.grids[gridKey(hall.id, key)]; if (!row || !row.grid[hh] || row.grid[hh][c] !== 'o') return;
   const two = !!(row.grid[hh + 1] && row.grid[hh + 1][c] === 'o'), dur = two ? 120 : 60;
   try {
-    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, date: key, time: `${pad(hh)}:00`, dur, court: `${COURT_NAME} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
+    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, hall_id: hall.id, date: key, time: `${pad(hh)}:00`, dur, court: `${hall.name} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
     const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) throw e2;
-    let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(key, g);
+    let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(hall.id, key, g);
     toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
   } catch (e) { fail(e, 'Slot anlegen'); }
 }
 async function deleteSlot(s) {
   try {
     const { error } = await sb.from('slots').delete().eq('id', s.id); if (error) throw error;
-    const row = DB.grids[s.date];
+    const row = s.hall_id ? DB.grids[gridKey(s.hall_id, s.date)] : null;
     if (row && s.court_idx !== null && s.court_idx !== undefined) {
       let g = row.grid; const h0 = hourOf(s.time);
       for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (g[hh] && g[hh][s.court_idx] === 'M') g = withCell(g, hh, s.court_idx, 'o');
-      await saveGrid(s.date, g);
+      await saveGrid(s.hall_id, s.date, g);
     }
     toast('Slot gelöscht'); await reload();
   } catch (e) { fail(e, 'Löschen'); }
@@ -742,16 +765,20 @@ function slotForm(dateKey) {
   f.innerHTML = `
     <label for="t-${uid}">Uhrzeit</label><input type="time" id="t-${uid}" value="19:00" required>
     <label for="d-${uid}">Dauer</label><select id="d-${uid}"><option value="60">60 Min</option><option value="90">90 Min</option><option value="120" selected>120 Min</option></select>
-    <label for="c-${uid}">Halle</label><input type="text" id="c-${uid}" list="courts-${uid}" value="${COURT_NAME}" required><datalist id="courts-${uid}">${COURTS.map(c => `<option value="${c}">`).join('')}</datalist>
-    <label for="p-${uid}">Platz</label><select id="p-${uid}">${Array.from({ length: COURTS_PER_DAY }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('')}<option value="">ohne Platz</option></select>
+    <label for="c-${uid}">Halle</label><select id="c-${uid}">${teamHalls().map(h => `<option value="${h.id}">${h.name}</option>`).join('')}<option value="">andere</option></select>
+    <input type="text" id="cn-${uid}" placeholder="Name der Halle" hidden>
+    <label for="p-${uid}">Platz</label><select id="p-${uid}"></select>
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
+  const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
+  const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
+  hallSel.addEventListener('change', fillPlaces); fillPlaces();
   f.addEventListener('submit', async e => {
     e.preventDefault();
-    const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, hall = f.querySelector(`#c-${uid}`).value.trim().toUpperCase(), pv = f.querySelector(`#p-${uid}`).value;
-    if (!time || !hall) return;
+    const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, h = hallById(hallSel.value), hall = h ? h.name : nameIn.value.trim().toUpperCase(), pv = placeSel.value;
+    if (!time || !hall) { toast('Halle fehlt.'); return; }
     const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
-    const { error } = await sb.from('slots').insert({ group_id: G.id, date: dateKey, time, dur, court, court_idx, created_by: me.id });
+    const { error } = await sb.from('slots').insert({ group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id });
     if (error) { fail(error, 'Slot anlegen'); return; }
     toast(`Slot ${time} in der ${court} angelegt.`); await reload();
   });
@@ -805,10 +832,51 @@ function playerRow(p) {
   return r;
 }
 
+// ======================= Hallen =======================
+$('#halls-btn').addEventListener('click', () => { if (!G) return; $('#halls-title').textContent = `Hallen · ${G.name}`; renderHalls(); $('#halls-modal').hidden = false; });
+$('#halls-close').addEventListener('click', () => { $('#halls-modal').hidden = true; });
+$('#halls-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#halls-modal').hidden = true; });
+function renderHalls() {
+  const list = $('#halls-list'); list.innerHTML = '';
+  const inTeam = new Set(DB.groupHalls.filter(x => x.group_id === G.id).map(x => x.hall_id));
+  if (!DB.halls.length) list.innerHTML = '<p>Noch keine Halle angelegt.</p>';
+  DB.halls.forEach(h => {
+    const r = document.createElement('div'); r.className = 'hall-row';
+    r.innerHTML = `<input type="checkbox" ${inTeam.has(h.id) ? 'checked' : ''} title="im Team"><input type="text" value="${h.name}" maxlength="40"><input type="number" min="1" max="12" value="${h.courts}" title="Plätze"><button class="btn btn-ghost btn-small" type="button">Speichern</button>`;
+    const [cb, nameIn, courtsIn, save] = r.children;
+    cb.addEventListener('change', async () => {
+      try {
+        if (cb.checked) { const { error } = await sb.from('group_halls').insert({ group_id: G.id, hall_id: h.id }); if (error) throw error; }
+        else { const { error } = await sb.from('group_halls').delete().eq('group_id', G.id).eq('hall_id', h.id); if (error) throw error; }
+        await reload(); renderHalls();
+      } catch (err) { fail(err, 'Halle zuordnen'); cb.checked = !cb.checked; }
+    });
+    save.addEventListener('click', async () => {
+      const name = nameIn.value.trim().toUpperCase(), courts = Math.max(1, Math.min(12, +courtsIn.value || 3));
+      if (!name) { toast('Name fehlt.'); return; }
+      const { error } = await sb.from('halls').update({ name, courts }).eq('id', h.id);
+      if (error) { fail(error, 'Halle speichern'); return; }
+      toast(`${name} gespeichert.`); await reload(); renderHalls();
+    });
+    list.append(r);
+  });
+}
+$('#hall-new').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#hall-new-name').value.trim().toUpperCase(), courts = Math.max(1, Math.min(12, +$('#hall-new-courts').value || 3));
+  if (!name) { toast('Name fehlt.'); return; }
+  try {
+    let h = DB.halls.find(x => x.name === name);
+    if (!h) { const { data, error } = await sb.from('halls').insert({ name, courts }).select().single(); if (error) throw error; h = data; }
+    const { error: e2 } = await sb.from('group_halls').upsert({ group_id: G.id, hall_id: h.id }, { onConflict: 'group_id,hall_id' }); if (e2) throw e2;
+    $('#hall-new-name').value = ''; toast(`${name} angelegt und dem Team zugeordnet.`); await reload(); renderHalls();
+  } catch (err) { fail(err, 'Halle anlegen'); }
+});
+
 // ======================= Screenshot-Import =======================
 let imp = null, impImg = null;
 const inWindow = (dayIdx, hour) => hour >= (dayIdx < 5 ? hourOf($('#imp-wd').value) : hourOf($('#imp-we').value));
-function analyzeScreenshot(img, rows) {
+function analyzeScreenshot(img, rows, courts) {
   const maxW = 3200, sc = Math.min(1, maxW / img.naturalWidth);
   const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
@@ -847,21 +915,21 @@ function analyzeScreenshot(img, rows) {
   const rh = (y1 - y0 + 1) / rows, cells = {};
   const sample = (cx, cy) => { const cnt = [0, 0, 0, 0, 0]; for (let y = cy - 4; y <= cy + 4; y++) for (let x = cx - 4; x <= cx + 4; x++) if (x >= 0 && y >= 0 && x < w && y < h) cnt[cls[y * w + x]]++; return cnt; };
   for (let dIdx = 0; dIdx < 7; dIdx++) {
-    const dw = (bounds[dIdx + 1] - bounds[dIdx]) / COURTS_PER_DAY;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < COURTS_PER_DAY; c++) {
+    const dw = (bounds[dIdx + 1] - bounds[dIdx]) / courts;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < courts; c++) {
       const cx = bounds[dIdx] + (c + 0.5) * dw, cy = y0 + (r + 0.5) * rh, tot = [0, 0, 0, 0, 0];
       [[cx - dw * 0.25, cy], [cx + dw * 0.25, cy], [cx, cy - rh * 0.3], [cx, cy + rh * 0.3]].forEach(([px, py]) => sample(Math.round(px), Math.round(py)).forEach((v, i) => tot[i] += v));
       cells[`${dIdx},${r},${c}`] = tot[1] > tot[2] && tot[1] > tot[3] ? 'X' : tot[2] > tot[3] ? 'o' : '.';
     }
   }
-  return { w, h, cv, x0, x1, y0, y1, bounds, rh, rows, cells };
+  return { w, h, cv, x0, x1, y0, y1, bounds, rh, rows, courts, cells };
 }
 function drawPreview() {
   if (!imp) return;
   const c = $('#imp-canvas'); c.width = imp.w; c.height = imp.h; const ctx = c.getContext('2d'); ctx.drawImage(imp.cv, 0, 0); let n = 0;
   for (let dIdx = 0; dIdx < 7; dIdx++) {
-    const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / COURTS_PER_DAY;
-    for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < COURTS_PER_DAY; cc++) {
+    const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / imp.courts;
+    for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < imp.courts; cc++) {
       if (imp.cells[`${dIdx},${r},${cc}`] !== 'o') continue;
       const win = inWindow(dIdx, imp.firstHour + r);
       ctx.fillStyle = win ? 'rgba(134,204,18,.7)' : 'rgba(134,204,18,.18)';
@@ -875,7 +943,8 @@ function runAnalysis() {
   if (!impImg) return;
   const first = hourOf($('#imp-first').value), last = hourOf($('#imp-last').value), rows = last - first + 1;
   if (rows < 1) { toast('Letzte Zeile muss nach der ersten liegen.'); return; }
-  imp = analyzeScreenshot(impImg, rows);
+  const hall = hallById($('#imp-hall').value); if (!hall) { toast('Bitte zuerst eine Halle im Team wählen (Hallen).'); return; }
+  imp = analyzeScreenshot(impImg, rows, hall.courts);
   if (!imp) { $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; toast('Raster nicht erkannt. Bitte den ganzen Wochenplan Mo bis So aufnehmen.'); return; }
   imp.firstHour = first; $('#imp-preview-wrap').hidden = false; drawPreview();
 }
@@ -886,6 +955,8 @@ function openImport() {
     opt.textContent = `KW ${isoWeek(mon)} · ${mon.getDate()}. ${MON[mon.getMonth()]} – ${sun.getDate()}. ${MON[sun.getMonth()]}`; sel.append(opt);
   }
   sel.value = weekOffset; $('#imp-wd').value = `${pad(DB.window.wd)}:00`; $('#imp-we').value = `${pad(DB.window.we)}:00`;
+  const hs = $('#imp-hall'); hs.innerHTML = teamHalls().map(h => `<option value="${h.id}">${h.name} (${h.courts} Plätze)</option>`).join('') || '<option value="">keine Halle im Team</option>';
+  const h0 = teamHalls()[0]; if (h0) { $('#imp-first').value = `${pad(h0.first_hour)}:00`; $('#imp-last').value = `${pad(h0.last_hour)}:00`; }
   imp = null; impImg = null; $('#imp-file').value = ''; $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; $('#imp-apply').disabled = true; $('#imp-apply').textContent = 'Übernehmen';
   $('#import-modal').hidden = false;
 }
@@ -899,34 +970,36 @@ const drop = $('#file-drop');
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('over'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
-['#imp-first', '#imp-last'].forEach(s => $(s).addEventListener('change', runAnalysis));
+['#imp-first', '#imp-last', '#imp-hall'].forEach(s => $(s).addEventListener('change', runAnalysis));
 ['#imp-wd', '#imp-we'].forEach(s => $(s).addEventListener('change', drawPreview));
 $('#imp-canvas').addEventListener('click', e => {
   if (!imp) return; const rect = e.currentTarget.getBoundingClientRect();
   const x = (e.clientX - rect.left) * imp.w / rect.width, y = (e.clientY - rect.top) * imp.h / rect.height;
   if (y < imp.y0 || y > imp.y1) return;
   const dIdx = imp.bounds.findIndex((b, i) => i < 7 && x >= b && x < imp.bounds[i + 1]); if (dIdx < 0) return;
-  const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / COURTS_PER_DAY, cc = Math.floor((x - imp.bounds[dIdx]) / dw), r = Math.floor((y - imp.y0) / imp.rh);
+  const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / imp.courts, cc = Math.floor((x - imp.bounds[dIdx]) / dw), r = Math.floor((y - imp.y0) / imp.rh);
   const k = `${dIdx},${r},${cc}`; imp.cells[k] = imp.cells[k] === 'o' ? '.' : 'o'; drawPreview();
 });
 $('#imp-apply').addEventListener('click', async () => {
   if (!imp) return;
   const off = +$('#imp-week').value, mon = addDays(thisMonday, off * 7), win = { wd: hourOf($('#imp-wd').value), we: hourOf($('#imp-we').value) };
+  const hall = hallById($('#imp-hall').value); if (!hall) return;
   const rows = []; let n = 0;
   for (let dIdx = 0; dIdx < 7; dIdx++) {
     const key = iso(addDays(mon, dIdx)), day = {};
     for (let r = 0; r < imp.rows; r++) {
       const hour = imp.firstHour + r; let row = '';
-      for (let cc = 0; cc < COURTS_PER_DAY; cc++) { const st = imp.cells[`${dIdx},${r},${cc}`]; row += st; if (st === 'o' && inWindow(dIdx, hour)) n++; }
+      for (let cc = 0; cc < imp.courts; cc++) { const st = imp.cells[`${dIdx},${r},${cc}`]; row += st; if (st === 'o' && inWindow(dIdx, hour)) n++; }
       day[hour] = row;
     }
-    DB.slots.filter(s => s.date === key && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
-    rows.push({ group_id: G.id, date: key, court: COURT_NAME, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
+    DB.slots.filter(s => s.date === key && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time); for (let hh = h0; hh < h0 + s.dur / 60; hh++) if (day[hh]) day[hh] = day[hh].slice(0, s.court_idx) + 'M' + day[hh].slice(s.court_idx + 1); });
+    rows.push({ group_id: G.id, hall_id: hall.id, date: key, court: hall.name, grid: day, source: 'screenshot', imported_at: new Date().toISOString() });
   }
   try {
-    const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,date' }); if (error) throw error;
+    const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,hall_id,date' }); if (error) throw error;
     const { error: e2 } = await sb.from('groups').update({ view_window: win }).eq('id', G.id); if (e2) throw e2;
-    closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${COURT_NAME} übernommen.`);
+    const { error: e3 } = await sb.from('halls').update({ first_hour: imp.firstHour, last_hour: imp.firstHour + imp.rows - 1 }).eq('id', hall.id); if (e3) throw e3;
+    closeImport(); weekOffset = off; await reload(); toast(`${n} freie Platz-Stunden für ${hall.name} übernommen.`);
   } catch (e) { fail(e, 'Import'); }
 });
 
