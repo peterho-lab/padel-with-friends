@@ -140,6 +140,9 @@ input[type=email], input[type=text], input[type=time], select {
 .slot .dur { font-size: .8rem; color: var(--ink-soft); }
 .slot .court { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--ball); color: #173A14; border-radius: 8px; padding: 4px 8px; text-align: right; line-height: 1.25; max-width: 55%; }
 .slot.full .court { background: var(--card); color: var(--ink); }
+.slot-right { display: grid; justify-items: end; gap: 4px; max-width: 55%; }
+.slot-right .court { max-width: 100%; }
+.creator { font-size: .75rem; color: var(--ink-soft); text-align: right; }
 .seats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .seat { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px dashed var(--line); background: transparent; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .9rem; display: grid; place-items: center; padding: 0; transition: transform .12s ease; }
 .seat.taken { border-style: solid; border-color: transparent; }
@@ -650,7 +653,7 @@ function renderSlot(s, isPast) {
   const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
   const el = document.createElement('article'); el.className = 'slot' + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
   const creator = person(s.created_by);
-  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div><div class="dur">angelegt von ${creator ? creator.name : '?'}</div></div><span class="court">${s.court}</span></div>`;
+  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court">${s.court}</span><span class="creator">von ${creator ? creator.name : '?'}</span></div></div>`;
   const seats = document.createElement('div'); seats.className = 'seats';
   for (let i = 0; i < MAX_PLAYERS; i++) {
     const su = players[i], p = su && person(su.player_id);
