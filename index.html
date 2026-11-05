@@ -151,6 +151,15 @@ input[type=email], input[type=text], input[type=time], select {
 .slot-right .court { max-width: 100%; }
 .creator { font-size: .75rem; color: var(--ink-soft); text-align: right; }
 .seats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.seats.many { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 6px; }
+.seats.many .seat { font-size: .75rem; }
+.slot.tournament { border-color: var(--match); }
+.slot.tournament.full { background: #FDF0E0; border-color: var(--match); }
+.tour-head { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); }
+.tour-tag { font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: var(--match); color: #fff; border-radius: 6px; padding: 3px 7px; }
+.tour-head b { font-size: 1rem; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .slot.tournament.full { background: #3A2A14; } }
+:root[data-theme="dark"] .slot.tournament.full { background: #3A2A14; }
 .seat { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px dashed var(--line); background: transparent; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: .9rem; display: grid; place-items: center; padding: 0; transition: transform .12s ease; }
 .seat.taken { border-style: solid; border-color: transparent; }
 .seat.s3 { font-size: .72rem; letter-spacing: -.02em; }
@@ -370,6 +379,8 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 // ======================= Konstanten =======================
 let COURT_NAME = 'EUROPAHALLE';
 const MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
+const capOf = s => s.max_players || MAX_PLAYERS;
+const isTournament = s => s.kind === 'tournament';
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
 const PART_LABEL = { all: 'Ich hätte Zeit', am: 'Vormittag', pm: 'Nachmittag' };
@@ -634,7 +645,7 @@ function renderWeek() {
       const gridHours = isPast ? [] : Object.keys(cg).map(Number).filter(hh => hh >= winStart && !/^\.+$/.test(cg[hh])).sort((a, b) => a - b);
       if (!gridHours.length) return; anyGrid = true;
       const overlay = {};
-      DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= MAX_PLAYERS; for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
+      DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= capOf(s); for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
       const blk = document.createElement('div'); blk.className = 'free-block';
       blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
       const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
@@ -666,13 +677,14 @@ function endTime(time, dur) { const [h, m] = time.split(':').map(Number); const 
 
 function renderSlot(s, isPast) {
   const players = slotPlayers(s), wait = slotWait(s);
-  const full = players.length >= MAX_PLAYERS, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
+  const cap = capOf(s), tour = isTournament(s), full = players.length >= cap, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
   const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
-  const el = document.createElement('article'); el.className = 'slot' + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
+  const el = document.createElement('article'); el.className = 'slot' + (tour ? ' tournament' : '') + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
   const creator = person(s.created_by);
-  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court">${s.court}</span><span class="creator" title="angelegt von ${creator ? creator.name : '?'}">von ${creator ? shortOf(creator) : '?'}</span></div></div>`;
-  const seats = document.createElement('div'); seats.className = 'seats';
-  for (let i = 0; i < MAX_PLAYERS; i++) {
+  el.innerHTML = `${tour ? `<div class="tour-head"><span class="tour-tag">Turnier</span><b></b></div>` : ''}<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court">${s.court}</span><span class="creator" title="angelegt von ${creator ? creator.name : '?'}">von ${creator ? shortOf(creator) : '?'}</span></div></div>`;
+  if (tour) el.querySelector('.tour-head b').textContent = s.title || 'Turnier';
+  const seats = document.createElement('div'); seats.className = 'seats'; if (cap > 4) seats.classList.add('many');
+  for (let i = 0; i < cap; i++) {
     const su = players[i], p = su && person(su.player_id);
     const b = document.createElement('button'); b.type = 'button';
     if (p) {
@@ -685,11 +697,11 @@ function renderSlot(s, isPast) {
     b.addEventListener('click', () => seatClick(s, su)); seats.append(b);
   }
   el.append(seats);
-  const open = MAX_PLAYERS - players.length, st = document.createElement('div'); st.className = 'status';
+  const open = cap - players.length, st = document.createElement('div'); st.className = 'status';
   if (cancelled) st.innerHTML = `<span class="cancel-pill">Abgesagt</span><span>von ${canceller ? canceller.name : '?'}</span>`;
-  else if (full) st.innerHTML = `<span>${mine ? 'Du bist dabei' : 'Platz ist voll'}</span><span class="pill"><img src="assets/ball.png" alt="">Match steht</span>`;
+  else if (full) st.innerHTML = `<span>${mine ? 'Du bist dabei' : tour ? 'Team ist komplett' : 'Platz ist voll'}</span><span class="pill"><img src="assets/ball.png" alt="">${tour ? 'Team steht' : 'Match steht'}</span>`;
   else if (mine) st.innerHTML = `<span>Du bist dabei</span><span>noch ${open} gesucht</span>`;
-  else st.innerHTML = `<span>${players.length} von ${MAX_PLAYERS}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
+  else st.innerHTML = `<span>${players.length} von ${cap}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
   if (!isPast && !cancelled && canOrganize()) {
@@ -753,7 +765,7 @@ async function toggleSlot(s) {
     } else {
       const { data, error } = await sb.from('signups').insert({ slot_id: s.id, player_id: me.id }).select().single(); if (error) throw error;
       const n = slotPlayers(s).length + 1;
-      toast(data.kind === 'wait' ? 'Voll. Du stehst auf der Warteliste.' : n >= MAX_PLAYERS ? 'Match steht! Ihr seid zu viert.' : `Eingetragen. Noch ${MAX_PLAYERS - n} frei.`);
+      toast(data.kind === 'wait' ? 'Voll. Du stehst auf der Warteliste.' : n >= capOf(s) ? (isTournament(s) ? 'Team komplett!' : 'Match steht! Ihr seid zu viert.') : `Eingetragen. Noch ${capOf(s) - n} frei.`);
     }
     await reload();
   } catch (e) { fail(e, 'Eintragen'); }
@@ -774,7 +786,7 @@ async function adminSignup(s, p) {
   try {
     const { data, error } = await sb.from('signups').insert({ slot_id: s.id, player_id: p.id }).select().single(); if (error) throw error;
     const n = slotPlayers(s).length + 1;
-    toast(data.kind === 'wait' ? `${p.name} steht auf der Warteliste.` : n >= MAX_PLAYERS ? `${p.name} eingetragen. Match steht!` : `${p.name} eingetragen. Noch ${MAX_PLAYERS - n} frei.`);
+    toast(data.kind === 'wait' ? `${p.name} steht auf der Warteliste.` : n >= capOf(s) ? `${p.name} eingetragen. ${isTournament(s) ? 'Team komplett!' : 'Match steht!'}` : `${p.name} eingetragen. Noch ${capOf(s) - n} frei.`);
     $('#pick-modal').hidden = true; await reload();
   } catch (e) { fail(e, 'Eintragen'); }
 }
@@ -881,17 +893,23 @@ function slotForm(dateKey) {
     <label for="c-${uid}">Halle</label><select id="c-${uid}">${teamHalls().map(h => `<option value="${h.id}">${h.name}</option>`).join('')}<option value="">andere</option></select>
     <input type="text" id="cn-${uid}" placeholder="Name der Halle" hidden>
     <label for="p-${uid}">Platz</label><select id="p-${uid}"></select>
+    ${canOrganize() ? `<label class="toggle"><input type="checkbox" id="tr-${uid}"> Turnier (fixer Termin, eigene Teamgröße)</label>
+    <div id="trf-${uid}" hidden><label for="tt-${uid}">Turniername</label><input type="text" id="tt-${uid}" placeholder="z. B. Vereinsturnier Graz" maxlength="60">
+    <label for="tm-${uid}">Teamgröße</label><input type="number" id="tm-${uid}" min="1" max="40" value="8"></div>` : ''}
     <div class="row"><button class="btn btn-primary btn-small" type="submit">Speichern</button><button class="btn btn-ghost btn-small" type="button" data-cancel>Abbrechen</button></div>`;
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
   const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
   hallSel.addEventListener('change', fillPlaces); fillPlaces();
+  const trCb = f.querySelector(`#tr-${uid}`); if (trCb) trCb.addEventListener('change', () => { f.querySelector(`#trf-${uid}`).hidden = !trCb.checked; });
   f.addEventListener('submit', async e => {
     e.preventDefault();
     const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, h = hallById(hallSel.value), hall = h ? h.name : nameIn.value.trim().toUpperCase(), pv = placeSel.value;
     if (!time || !hall) { toast('Halle fehlt.'); return; }
     const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
-    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id }).select().single();
+    const rec = { group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id };
+    if (trCb && trCb.checked) { rec.kind = 'tournament'; rec.title = f.querySelector(`#tt-${uid}`).value.trim() || 'Turnier'; rec.max_players = Math.max(1, Math.min(40, +f.querySelector(`#tm-${uid}`).value || 8)); }
+    const { data: slot, error } = await sb.from('slots').insert(rec).select().single();
     if (error) { fail(error, 'Slot anlegen'); return; }
     const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) { fail(e2, 'Eintragen'); }
     toast(`Slot ${time} in der ${court} angelegt, du bist eingetragen.`); await reload();
