@@ -91,7 +91,11 @@ input[type=email], input[type=text], input[type=time], select {
 .nav:disabled { opacity: .35; cursor: default; }
 .legend { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: .8rem; color: var(--ink-soft); padding-bottom: 8px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; position: relative; }
+.legend span.online i::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--accent); animation: pulse 1.6s ease-out infinite; }
+.legend span.online { color: var(--ink); font-weight: 700; }
+@keyframes pulse { 0% { transform: scale(.7); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .legend span.online i::after { animation: none; opacity: .8; transform: none; } }
 .legend-status { padding-top: 18px; padding-bottom: 0; }
 .grid-meta { text-align: center; font-size: .8rem; color: var(--ink-soft); padding-bottom: 12px; }
 .grid-meta b { color: var(--ink); }
@@ -469,6 +473,17 @@ async function reload() { try { await loadAll(); if (me) { me = person(me.id) ||
 function subscribe() {
   sb.channel('pwf').on('postgres_changes', { event: '*', schema: 'public' }, scheduleReload).subscribe();
 }
+// Wer ist gerade online? (Realtime Presence, kein Speichern in der Datenbank)
+let online = new Set(), presence = null;
+function joinPresence() {
+  if (!sb || !me) return;
+  if (presence) { presence.untrack(); sb.removeChannel(presence); presence = null; }
+  presence = sb.channel('pwf-online', { config: { presence: { key: me.id } } });
+  presence.on('presence', { event: 'sync' }, () => {
+    const st = presence.presenceState(); online = new Set(Object.keys(st)); if (me) renderLegend();
+  }).subscribe(async status => { if (status === 'SUBSCRIBED') await presence.track({ player_id: me.id, group: G ? G.slug : null, at: Date.now() }); });
+}
+function leavePresence() { if (presence) { presence.untrack(); sb.removeChannel(presence); presence = null; } online = new Set(); }
 
 // ======================= Login =======================
 let pendingEmail = '';
@@ -534,6 +549,7 @@ async function setGroup(g) {
   if (hashSlug() !== g.slug) history.replaceState(null, '', '#' + g.slug);
   document.title = `${g.name} · Padel With Friends`;
   $('#group-modal').hidden = true;
+  joinPresence();
   try { await loadGroup(); } catch (e) { fail(e, 'Laden'); }
   showApp();
 }
@@ -549,7 +565,7 @@ function showApp() {
   $('#app').classList.toggle('admin', adminMode && canOrganize());
   renderLegend(); renderWeek();
 }
-$('#logout').addEventListener('click', () => { me = null; G = null; LS.del('pwf-user'); showApp(); });
+$('#logout').addEventListener('click', () => { leavePresence(); me = null; G = null; LS.del('pwf-user'); showApp(); });
 window.addEventListener('hashchange', () => { const g = groupBySlug(hashSlug()); if (me && g && (!G || g.id !== G.id)) chooseGroup(g.slug); });
 
 // ======================= Team wählen / anlegen =======================
@@ -587,7 +603,7 @@ $('#admin-toggle').addEventListener('change', e => { adminMode = e.target.checke
 function renderLegend() {
   const top = $('#legend'), bottom = $('#legend-status'); top.innerHTML = ''; bottom.innerHTML = '';
   const add = (el, bg, text, sq) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${bg}${sq ? ';border-radius:4px' : ''}"></i>${text}`; el.append(s); };
-  members().filter(p => p.regular).forEach(p => add(top, p.color || 'var(--guest)', `${p.name} (${shortOf(p)})`));
+  members().filter(p => p.regular).forEach(p => { add(top, p.color || 'var(--guest)', `${p.name} (${shortOf(p)})`); if (online.has(p.id)) { const el = top.lastElementChild; el.classList.add('online'); el.title = 'gerade online'; } });
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
   add(bottom, 'var(--free)', 'Halle frei', true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
