@@ -649,7 +649,8 @@ function renderSlot(s, isPast) {
   const full = players.length >= MAX_PLAYERS, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
   const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
   const el = document.createElement('article'); el.className = 'slot' + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
-  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><span class="court">${s.court}</span></div>`;
+  const creator = person(s.created_by);
+  el.innerHTML = `<div class="slot-top"><div><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div><div class="dur">angelegt von ${creator ? creator.name : '?'}</div></div><span class="court">${s.court}</span></div>`;
   const seats = document.createElement('div'); seats.className = 'seats';
   for (let i = 0; i < MAX_PLAYERS; i++) {
     const su = players[i], p = su && person(su.player_id);
