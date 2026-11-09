@@ -133,6 +133,11 @@ input[type=email], input[type=text], input[type=time], select {
 .hall-pick select option { color: var(--ink); background: var(--card); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .free-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
 .free-label img { height: 14px; width: auto; }
+.free-addr { display: block; font-size: .72rem; color: var(--ink-soft); text-decoration: none; margin: -2px 0 6px; }
+.free-addr:hover { text-decoration: underline; }
+.slot .dateline a.addr { display: block; font-weight: 600; color: var(--ink-soft); text-decoration: none; margin-top: 2px; }
+.slot .dateline a.addr:hover { text-decoration: underline; }
+.hall-row .addr-in { grid-column: 1 / -1; }
 .cg { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: .72rem; }
 .hall-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
 .hall-row input[type="text"] { padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; min-width: 0; }
@@ -417,6 +422,8 @@ const isSingle = (hall, c) => !!hall && Array.isArray(hall.singles) && hall.sing
 const courtName = (hall, c) => isSingle(hall, c) ? `Einzelplatz ${c + 1}` : `Platz ${c + 1}`;
 const courtOptLabel = (hall, c) => isSingle(hall, c) ? `Einzelplatz ${c + 1} (2 Spieler)` : `Platz ${c + 1}`;
 const capFor = (hall, c) => isSingle(hall, c) ? 2 : MAX_PLAYERS;
+const mapsUrl = addr => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+const addrLink = (hall, cls) => hall && hall.address ? `<a class="${cls}" href="${mapsUrl(hall.address)}" target="_blank" rel="noopener" title="In Karten öffnen">📍 ${hall.address.replace(/</g, '&lt;')}</a>` : '';
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
 const PART_LABEL = { all: 'Ich hätte Zeit', am: 'Vormittag', pm: 'Nachmittag' };
@@ -715,7 +722,7 @@ function renderWeek() {
       const overlay = {};
       DB.slots.filter(s => s.date === key && !s.cancelled_at && s.hall_id === hall.id && s.court_idx !== null && s.court_idx !== undefined).forEach(s => { const h0 = hourOf(s.time), full = slotPlayers(s).length >= capOf(s); for (let hh = h0; hh < h0 + s.dur / 60; hh++) overlay[`${hh},${s.court_idx}`] = full ? 'F' : 'M'; });
       const blk = document.createElement('div'); blk.className = 'free-block'; blk.style.setProperty('--hall', hallColor(hall));
-      blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
+      blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>${addrLink(hall, 'free-addr')}`;
       const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
       grid.innerHTML = '<span></span>' + Array.from({ length: hall.courts }, (_, c) => `<span class="cg-p${isSingle(hall, c) ? ' single' : ''}" title="${courtName(hall, c)}${isSingle(hall, c) ? ' · 2 Spieler' : ''}">${isSingle(hall, c) ? 'E' : 'P'}${c + 1}</span>`).join('');
       gridHours.forEach(hh => {
@@ -776,7 +783,7 @@ function renderSlot(s, isPast) {
   else st.innerHTML = `<span>${players.length} von ${cap}</span><span>${players.length === 0 ? 'Wer ist dabei?' : `noch ${open} frei`}</span>`;
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
-  const dl = document.createElement('div'); dl.className = 'dateline'; dl.textContent = longDate(s.date); el.append(dl);
+  const dl = document.createElement('div'); dl.className = 'dateline'; dl.textContent = longDate(s.date); if (slotHall && slotHall.address) dl.insertAdjacentHTML('beforeend', addrLink(slotHall, 'addr')); el.append(dl);
   if (!isPast && cancelled && canOrganize()) {
     const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'linkbtn sm'; rb.textContent = 'Absage zurücknehmen';
     rb.addEventListener('click', () => restoreSlot(s)); el.append(rb);
@@ -1130,6 +1137,7 @@ function renderHalls() {
     const chips = document.createElement('div'); chips.className = 'court-chips';
     const paintChips = () => { chips.innerHTML = ''; const nC = Math.max(1, Math.min(12, +courtsIn.value || h.courts)); for (let i = 0; i < nC; i++) { const b = document.createElement('button'); b.type = 'button'; b.className = 'court-chip' + (singles.includes(i) ? ' single' : ''); b.textContent = (singles.includes(i) ? 'E' : 'P') + (i + 1); b.title = singles.includes(i) ? 'Einzelplatz (2 Spieler) · Tippen: normaler Platz' : 'Platz (4 Spieler) · Tippen: Einzelplatz'; b.addEventListener('click', () => { singles = singles.includes(i) ? singles.filter(x => x !== i) : [...singles, i].sort((a, b) => a - b); paintChips(); }); chips.append(b); } };
     courtsIn.addEventListener('input', paintChips); paintChips(); r.append(chips);
+    const addrIn = document.createElement('input'); addrIn.type = 'text'; addrIn.className = 'addr-in'; addrIn.placeholder = 'Adresse, z. B. Gutheil-Schoder-Gasse 7, 1100 Wien'; addrIn.maxLength = 120; addrIn.value = h.address || ''; r.append(addrIn);
     cb.addEventListener('change', async () => {
       try {
         if (cb.checked) { const { error } = await sb.from('group_halls').insert({ group_id: G.id, hall_id: h.id }); if (error) throw error; }
@@ -1141,7 +1149,9 @@ function renderHalls() {
       const name = nameIn.value.trim().toUpperCase(), courts = Math.max(1, Math.min(12, +courtsIn.value || 3));
       if (!name) { toast('Name fehlt.'); return; }
       singles = singles.filter(i => i < courts);
-      let { error } = await sb.from('halls').update({ name, courts, singles }).eq('id', h.id);
+      const address = addrIn.value.trim() || null;
+      let { error } = await sb.from('halls').update({ name, courts, singles, address }).eq('id', h.id);
+      if (error && /address/.test(error.message || '')) { ({ error } = await sb.from('halls').update({ name, courts, singles }).eq('id', h.id)); if (!error && address) toast('Adresse braucht noch migration-address.sql in Supabase.'); }
       if (error && /singles/.test(error.message || '')) { ({ error } = await sb.from('halls').update({ name, courts }).eq('id', h.id)); if (!error && singles.length) toast('Einzelplätze brauchen noch migration-singles.sql in Supabase.'); }
       if (error) { fail(error, 'Halle speichern'); return; }
       toast(`${name} gespeichert.`); await reload(); renderHalls();
