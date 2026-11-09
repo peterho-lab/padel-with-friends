@@ -337,12 +337,12 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <div class="modal" id="import-modal" hidden>
   <div class="modal-card">
     <div class="slot-top"><h2>Platzbelegung importieren</h2><button class="linkbtn" id="imp-close" type="button">Schließen</button></div>
-    <p>Screenshot des Wochenplans Montag bis Sonntag aus dem Buchungssystem. Blau gilt als gebucht, Hellgrün als frei, Grau als nicht buchbar.</p>
+    <p>Screenshot des Wochenplans Montag bis Sonntag aus dem Buchungssystem. Zwei Layouts werden erkannt: Tage nebeneinander (eTennis, z. B. Europahalle: Blau gebucht, Hellgrün frei, Grau nicht buchbar) und Tage untereinander mit Stunden als Spalten (z. B. PADELZONE: Grün mit Preis = frei, Weiß = belegt).</p>
     <div class="imp-grid">
       <div class="field"><label for="imp-hall">Halle</label><select id="imp-hall"></select></div>
       <div class="field"><label for="imp-week">Woche</label><select id="imp-week"></select></div>
-      <div class="field"><label for="imp-first">Erste Zeile</label><input type="time" id="imp-first" value="07:00"></div>
-      <div class="field"><label for="imp-last">Letzte Zeile</label><input type="time" id="imp-last" value="22:00"></div>
+      <div class="field"><label for="imp-first">Erste Stunde</label><input type="time" id="imp-first" value="07:00"></div>
+      <div class="field"><label for="imp-last">Letzte Stunde</label><input type="time" id="imp-last" value="22:00"></div>
       <div class="field"><label for="imp-wd">Anzeigen Mo–Fr ab</label><input type="time" id="imp-wd" value="17:00"></div>
       <div class="field"><label for="imp-we">Anzeigen Sa/So ab</label><input type="time" id="imp-we" value="09:00"></div>
     </div>
@@ -1209,21 +1209,83 @@ function analyzeScreenshot(img, rows, courts) {
       cells[`${dIdx},${r},${c}`] = tot[1] > tot[2] && tot[1] > tot[3] ? 'X' : tot[2] > tot[3] ? 'o' : '.';
     }
   }
-  return { w, h, cv, x0, x1, y0, y1, bounds, rh, rows, courts, cells };
+  const rect = (dIdx, r, c) => { const dw = (bounds[dIdx + 1] - bounds[dIdx]) / courts; return { x: bounds[dIdx] + c * dw, y: y0 + r * rh, w: dw, h: rh }; };
+  return { w, h, cv, layout: 'etennis', rows, courts, cells, rect };
+}
+// Layout 2: Tage untereinander, Stunden als Spalten, Plätze als Zeilen (z. B. PADELZONE / Eversports). Grün mit Preis = frei.
+function analyzeStacked(img, rows, courts) {
+  const maxW = 3200, sc = Math.min(1, maxW / img.naturalWidth);
+  const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const cls = new Uint8Array(w * h);  // 1 grün (frei), 2 dunkle Linie, 3 helle Linie
+  for (let i = 0, p = 0; i < cls.length; i++, p += 4) {
+    const r = d[p], g = d[p + 1], b = d[p + 2]; const grey = Math.abs(r - g) < 12 && Math.abs(g - b) < 12;
+    if (g > r + 40 && b > r + 30 && g > 110 && g < 190 && r < 120) cls[i] = 1;
+    else if (grey && r < 170) cls[i] = 2;
+    else if (grey && r < 240) cls[i] = 3;
+  }
+  // dicke Linie unter jedem Tageskopf
+  const thick = []; let run = null;
+  for (let y = 0; y < h; y++) { let dark = 0; for (let x = 0; x < w; x++) if (cls[y * w + x] === 2) dark++; if (dark > w * 0.5) { if (run && y - run.end <= 2) run.end = y; else { run = { start: y, end: y }; thick.push(run); } } else run = null; }
+  const ty = thick.map(t => (t.start + t.end) / 2).slice(0, 7);
+  if (ty.length < 7) return null;
+  // Platz-Zeilen: grüne Läufe direkt unter der dicken Linie
+  const median = a => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : NaN; };
+  const pitches = [], offs = [];
+  ty.forEach((t, i) => {
+    const yEnd = Math.min(h, i + 1 < ty.length ? ty[i + 1] - 40 : h), rr = [];
+    for (let y = Math.round(t); y < yEnd; y++) { let g = 0; for (let x = 0; x < w; x++) if (cls[y * w + x] === 1) g++; if (g > 3) { const rel = y - t; if (rr.length && rel - rr[rr.length - 1][1] <= 1) rr[rr.length - 1][1] = rel; else rr.push([rel, rel]); } }
+    const rows_ = rr.filter(x => x[1] - x[0] >= 6).slice(0, courts);
+    for (let k = 0; k + 1 < rows_.length; k++) pitches.push(rows_[k + 1][0] - rows_[k][0]);
+    if (rows_.length) offs.push(rows_[0][0]);
+  });
+  let pitch = median(pitches), off = median(offs);
+  if (!(pitch > 4)) { if (courts === 1 && offs.length) { const t0 = ty[0]; let yy = Math.round(t0 + off); while (yy < h && [...Array(w).keys()].some(x => cls[yy * w + x] === 1)) yy++; pitch = yy - (t0 + off); } else return null; }
+  if (!(off >= 0)) off = 2;
+  // Stunden-Spalten: senkrechte Linien im Kopfbereich aller Tage
+  const cand = new Uint16Array(w);
+  ty.forEach(t => { const ya = Math.max(0, Math.round(t - pitch * 1.2)), yb = Math.round(t) - 3; if (yb <= ya) return; for (let x = 0; x < w; x++) { let c = 0; for (let y = ya; y < yb; y++) { const k = cls[y * w + x]; if (k === 2 || k === 3) c++; } if (c > (yb - ya) * 0.4) cand[x]++; } });
+  const lines = []; run = null;
+  for (let x = 0; x < w; x++) { if (cand[x] >= 3) { if (run && x - run.end <= 2) run.end = x; else { run = { start: x, end: x }; lines.push(run); } } else run = null; }
+  const lx = lines.map(l => (l.start + l.end) / 2);
+  if (lx.length < 2) return null;
+  const x0 = lx[0]; let cw;
+  if (lx.length - 1 === rows) cw = (lx[lx.length - 1] - x0) / rows;
+  else { const diffs = lx.slice(1).map((v, i) => v - lx[i]).filter(v => v > 8); cw = Math.min(...diffs); }
+  if (!(cw > 8)) return null;
+  const sample = (cx, cy) => { let g = 0, t = 0; for (let y = Math.round(cy) - 3; y <= Math.round(cy) + 3; y++) for (let x = Math.round(cx) - 3; x <= Math.round(cx) + 3; x++) if (x >= 0 && y >= 0 && x < w && y < h) { t++; if (cls[y * w + x] === 1) g++; } return t ? g / t : 0; };
+  const cells = {};
+  for (let dIdx = 0; dIdx < 7; dIdx++) for (let c = 0; c < courts; c++) {
+    const cy = ty[dIdx] + off + (c + 0.5) * pitch;
+    for (let r = 0; r < rows; r++) {
+      const xa = x0 + r * cw, dy = pitch * 0.3;
+      const left = (sample(xa + cw * 0.25, cy - dy) + sample(xa + cw * 0.25, cy + dy)) / 2 > 0.6;
+      const right = (sample(xa + cw * 0.75, cy - dy) + sample(xa + cw * 0.75, cy + dy)) / 2 > 0.6;
+      cells[`${dIdx},${r},${c}`] = left && right ? 'o' : 'X';   // halbe Stunden zählen nicht als freie Stunde
+    }
+  }
+  const rect = (dIdx, r, c) => ({ x: x0 + r * cw, y: ty[dIdx] + off + c * pitch, w: cw, h: pitch });
+  return { w, h, cv, layout: 'stacked', rows, courts, cells, rect };
+}
+// Welches Layout zeigt der Screenshot? Zählt grüne (PADELZONE) gegen blaue (eTennis) Pixel in einer kleinen Kopie.
+function detectLayout(img) {
+  const cv = document.createElement('canvas'), sw = 240, sh = Math.max(1, Math.round(img.naturalHeight * sw / img.naturalWidth)); cv.width = sw; cv.height = sh;
+  const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, sw, sh); const d = ctx.getImageData(0, 0, sw, sh).data; let teal = 0, blue = 0;
+  for (let p = 0; p < d.length; p += 4) { const r = d[p], g = d[p + 1], b = d[p + 2]; if (g > r + 40 && b > r + 30 && g > 110 && g < 190 && r < 120) teal++; else if (b > 170 && r < 100 && g < 120) blue++; }
+  return teal > blue ? 'stacked' : 'etennis';
 }
 function drawPreview() {
   if (!imp) return;
   const c = $('#imp-canvas'); c.width = imp.w; c.height = imp.h; const ctx = c.getContext('2d'); ctx.drawImage(imp.cv, 0, 0); let n = 0;
-  for (let dIdx = 0; dIdx < 7; dIdx++) {
-    const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / imp.courts;
-    for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < imp.courts; cc++) {
-      if (imp.cells[`${dIdx},${r},${cc}`] !== 'o') continue;
-      const win = inWindow(dIdx, imp.firstHour + r);
-      ctx.fillStyle = win ? 'rgba(134,204,18,.7)' : 'rgba(134,204,18,.18)';
-      ctx.fillRect(imp.bounds[dIdx] + cc * dw + 2, imp.y0 + r * imp.rh + 2, dw - 4, imp.rh - 4); if (win) n++;
-    }
+  for (let dIdx = 0; dIdx < 7; dIdx++) for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < imp.courts; cc++) {
+    if (imp.cells[`${dIdx},${r},${cc}`] !== 'o') continue;
+    const win = inWindow(dIdx, imp.firstHour + r), q = imp.rect(dIdx, r, cc);
+    ctx.fillStyle = win ? 'rgba(134,204,18,.7)' : 'rgba(134,204,18,.18)';
+    ctx.fillRect(q.x + 2, q.y + 2, q.w - 4, q.h - 4); if (win) n++;
   }
-  $('#imp-summary').textContent = `${n} freie Platz-Stunden im Zeitfenster erkannt. Kräftig grün = wird angezeigt. Zelle antippen, um sie zu ändern.`;
+  $('#imp-summary').textContent = `${imp.layout === 'stacked' ? 'Layout: Tage untereinander. ' : 'Layout: Tage nebeneinander. '}${n} freie Platz-Stunden im Zeitfenster erkannt. Kräftig grün = wird angezeigt. Zelle antippen, um sie zu ändern.`;
   $('#imp-apply').disabled = n === 0; $('#imp-apply').textContent = n ? `${n} freie Stunden übernehmen` : 'Übernehmen';
 }
 function runAnalysis() {
@@ -1231,7 +1293,7 @@ function runAnalysis() {
   const first = hourOf($('#imp-first').value), last = hourOf($('#imp-last').value), rows = last - first + 1;
   if (rows < 1) { toast('Letzte Zeile muss nach der ersten liegen.'); return; }
   const hall = hallById($('#imp-hall').value); if (!hall) { toast('Bitte zuerst eine Halle im Team wählen (Hallen).'); return; }
-  imp = analyzeScreenshot(impImg, rows, hall.courts);
+  imp = detectLayout(impImg) === 'stacked' ? analyzeStacked(impImg, rows, hall.courts) : analyzeScreenshot(impImg, rows, hall.courts);
   if (!imp) { $('#imp-preview-wrap').hidden = true; $('#imp-summary').textContent = ''; toast('Raster nicht erkannt. Bitte den ganzen Wochenplan Mo bis So aufnehmen.'); return; }
   imp.firstHour = first; $('#imp-preview-wrap').hidden = false; drawPreview();
 }
@@ -1262,10 +1324,10 @@ drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('
 $('#imp-canvas').addEventListener('click', e => {
   if (!imp) return; const rect = e.currentTarget.getBoundingClientRect();
   const x = (e.clientX - rect.left) * imp.w / rect.width, y = (e.clientY - rect.top) * imp.h / rect.height;
-  if (y < imp.y0 || y > imp.y1) return;
-  const dIdx = imp.bounds.findIndex((b, i) => i < 7 && x >= b && x < imp.bounds[i + 1]); if (dIdx < 0) return;
-  const dw = (imp.bounds[dIdx + 1] - imp.bounds[dIdx]) / imp.courts, cc = Math.floor((x - imp.bounds[dIdx]) / dw), r = Math.floor((y - imp.y0) / imp.rh);
-  const k = `${dIdx},${r},${cc}`; imp.cells[k] = imp.cells[k] === 'o' ? '.' : 'o'; drawPreview();
+  for (let dIdx = 0; dIdx < 7; dIdx++) for (let r = 0; r < imp.rows; r++) for (let cc = 0; cc < imp.courts; cc++) {
+    const q = imp.rect(dIdx, r, cc);
+    if (x >= q.x && x < q.x + q.w && y >= q.y && y < q.y + q.h) { const k = `${dIdx},${r},${cc}`; imp.cells[k] = imp.cells[k] === 'o' ? (imp.layout === 'stacked' ? 'X' : '.') : 'o'; drawPreview(); return; }
+  }
 });
 $('#imp-apply').addEventListener('click', async () => {
   if (!imp) return;
