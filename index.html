@@ -139,6 +139,11 @@ input[type=email], input[type=text], input[type=time], select {
 .hall-row input[type="number"] { width: 64px; padding: 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
 .cg-h { color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; padding-right: 4px; }
 .cg-p { text-align: center; color: var(--ink-soft); font-weight: 700; font-size: .65rem; }
+.cg-p.single { color: var(--match); }
+.cg-cell.free.single { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(255,255,255,.45) 5px 8px); }
+.court-chips { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: .75rem; color: var(--ink-soft); }
+.court-chip { border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 2px 9px; font: inherit; font-size: .75rem; font-weight: 700; }
+.court-chip.single { border-color: var(--match); background: color-mix(in srgb, var(--match) 18%, var(--card)); }
 .cg-cell { height: 22px; border-radius: 5px; border: 0; padding: 0; background: var(--cg-grey); cursor: default; }
 .cg-cell.free { background: var(--free); cursor: pointer; }
 .cg-cell.free:hover { filter: brightness(.9); }
@@ -365,7 +370,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
 <div class="modal" id="halls-modal" hidden>
   <div class="modal-card pick-card">
     <div class="slot-top"><h2 id="halls-title">Hallen</h2><button class="linkbtn" id="halls-close" type="button">Schließen</button></div>
-    <p>Haken = das Team spielt dort. Pro Halle die Anzahl der Plätze, die im Buchungsplan nebeneinander stehen.</p>
+    <p>Haken = das Team spielt dort. Pro Halle die Anzahl der Plätze, die im Buchungsplan nebeneinander stehen. Tippe auf einen Platz, um ihn als Einzelplatz (2 Spieler) zu markieren.</p>
     <div class="pick-list" id="halls-list"></div>
     <form class="pick-guest" id="hall-new">
       <label for="hall-new-name">Neue Halle</label>
@@ -408,6 +413,10 @@ let COURT_NAME = 'EUROPAHALLE';
 const MAX_PLAYERS = 4, MAX_WEEKS_AHEAD = 4;
 const capOf = s => s.max_players || MAX_PLAYERS;
 const isTournament = s => s.kind === 'tournament';
+const isSingle = (hall, c) => !!hall && Array.isArray(hall.singles) && hall.singles.includes(c);
+const courtName = (hall, c) => isSingle(hall, c) ? `Einzelplatz ${c + 1}` : `Platz ${c + 1}`;
+const courtOptLabel = (hall, c) => isSingle(hall, c) ? `Einzelplatz ${c + 1} (2 Spieler)` : `Platz ${c + 1}`;
+const capFor = (hall, c) => isSingle(hall, c) ? 2 : MAX_PLAYERS;
 const PALETTE = [['#E8735A','Koralle'],['#3F7FD9','Blau'],['#8E5BD6','Violett'],['#F0962E','Orange'],['#1F8A8A','Petrol'],['#C2185B','Himbeere'],['#7A5230','Braun'],['#2E9E4F','Grün'],['#D4A017','Senf'],['#5C6BC0','Indigo']];
 const WD = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
 const PART_LABEL = { all: 'Ich hätte Zeit', am: 'Vormittag', pm: 'Nachmittag' };
@@ -635,6 +644,7 @@ function renderLegend() {
   add(top, 'var(--guest)', 'Gäste');
   add(bottom, 'var(--ball)', 'Match steht (4 Spieler)'); add(bottom, 'var(--accent)', 'Deine Plätze');
   teamHalls().forEach(h => add(bottom, `color-mix(in srgb, ${hallColor(h)} 30%, var(--card)); border: 2px solid ${hallColor(h)}`, h.name, true));
+  if (teamHalls().some(h => Array.isArray(h.singles) && h.singles.length)) add(bottom, 'var(--free); background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(255,255,255,.45) 5px 8px)', 'E = Einzelplatz (2 Spieler)', true);
   add(bottom, 'var(--free)', 'Halle frei', true); add(bottom, 'var(--booked)', 'gebucht', true); add(bottom, 'var(--ball)', 'unser Slot', true); add(bottom, 'var(--ball); box-shadow: inset 0 0 0 3px var(--match)', 'Match steht', true);
 }
 
@@ -706,13 +716,13 @@ function renderWeek() {
       const blk = document.createElement('div'); blk.className = 'free-block'; blk.style.setProperty('--hall', hallColor(hall));
       blk.innerHTML = `<div class="free-label"><img src="assets/ball.png" alt="">${hall.name}</div>`;
       const grid = document.createElement('div'); grid.className = 'cg'; grid.style.gridTemplateColumns = `auto repeat(${hall.courts}, minmax(0, 1fr))`;
-      grid.innerHTML = '<span></span>' + Array.from({ length: hall.courts }, (_, c) => `<span class="cg-p">P${c + 1}</span>`).join('');
+      grid.innerHTML = '<span></span>' + Array.from({ length: hall.courts }, (_, c) => `<span class="cg-p${isSingle(hall, c) ? ' single' : ''}" title="${courtName(hall, c)}${isSingle(hall, c) ? ' · 2 Spieler' : ''}">${isSingle(hall, c) ? 'E' : 'P'}${c + 1}</span>`).join('');
       gridHours.forEach(hh => {
         const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${hh}–${hh + 1}`; lab.title = `${pad(hh)}:00 bis ${pad(hh + 1)}:00`; grid.append(lab);
         for (let c = 0; c < hall.courts; c++) {
           const ov = overlay[`${hh},${c}`], st = ov ? 'M' : (cg[hh][c] || '.'), b = document.createElement('button'); b.type = 'button';
-          b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '');
-          b.title = st === 'o' ? `${hall.name}, Platz ${c + 1}, ${hh}–${hh + 1} Uhr frei. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Halle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
+          b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '') + (isSingle(hall, c) ? ' single' : '');
+          b.title = st === 'o' ? `${hall.name}, ${courtName(hall, c)}, ${hh}–${hh + 1} Uhr frei${isSingle(hall, c) ? ' (2 Spieler)' : ''}. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Halle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
           if (st === 'o') b.addEventListener('click', () => claimFree(key, hall, hh, c)); else b.disabled = true;
           grid.append(b);
         }
@@ -924,13 +934,15 @@ async function claimFree(key, hall, hh, c) {
   const twoFree = !!(row.grid[hh + 1] && row.grid[hh + 1][c] === 'o');
   const opts = [{ value: 60, label: '1 Stunde', hint: `${pad(hh)}:00–${pad(hh + 1)}:00` }];
   if (twoFree) opts.push({ value: 120, label: '2 Stunden', hint: `${pad(hh)}:00–${pad(hh + 2)}:00` });
-  const dur = await choose('Wie lange?', `${hall.name}, Platz ${c + 1}, ${(d => `${WD_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}. ${MON[d.getMonth()]}`)(new Date(key + 'T12:00:00'))}`, opts); if (!dur) return;
+  const dur = await choose('Wie lange?', `${hall.name}, ${courtName(hall, c)}${isSingle(hall, c) ? ' (2 Spieler)' : ''}, ${(d => `${WD_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}. ${MON[d.getMonth()]}`)(new Date(key + 'T12:00:00'))}`, opts); if (!dur) return;
   const two = dur === 120;
   try {
-    const { data: slot, error } = await sb.from('slots').insert({ group_id: G.id, hall_id: hall.id, date: key, time: `${pad(hh)}:00`, dur, court: `${hall.name} · Platz ${c + 1}`, court_idx: c, created_by: me.id }).select().single(); if (error) throw error;
+    const rec = { group_id: G.id, hall_id: hall.id, date: key, time: `${pad(hh)}:00`, dur, court: `${hall.name} · ${courtName(hall, c)}`, court_idx: c, created_by: me.id };
+    if (isSingle(hall, c)) rec.max_players = 2;
+    const { data: slot, error } = await sb.from('slots').insert(rec).select().single(); if (error) throw error;
     const { error: e2 } = await sb.from('signups').insert({ slot_id: slot.id, player_id: me.id }); if (e2) throw e2;
     let g = withCell(row.grid, hh, c, 'M'); if (two) g = withCell(g, hh + 1, c, 'M'); await saveGrid(hall.id, key, g);
-    toast(`Slot ${pad(hh)}:00 auf Platz ${c + 1} angelegt (${dur / 60}h), du bist eingetragen.`); await reload();
+    toast(`Slot ${pad(hh)}:00 auf ${courtName(hall, c)} angelegt (${dur / 60}h${isSingle(hall, c) ? ', 2 Spieler' : ''}), du bist eingetragen.`); await reload();
   } catch (e) { fail(e, 'Slot anlegen'); }
 }
 function hallEditor(s, host) {
@@ -938,7 +950,7 @@ function hallEditor(s, host) {
   const box = document.createElement('div'); box.className = 'hall-edit';
   const hs = document.createElement('select'); hs.innerHTML = halls.map(h => `<option value="${h.id}" ${h.id === s.hall_id ? 'selected' : ''}>${h.name}</option>`).join('');
   const ps = document.createElement('select');
-  const fill = () => { const h = hallById(hs.value); ps.innerHTML = Array.from({ length: h ? h.courts : 0 }, (_, i) => `<option value="${i}" ${hs.value === s.hall_id && i === s.court_idx ? 'selected' : ''}>Platz ${i + 1}</option>`).join('') + `<option value="" ${s.court_idx === null || s.court_idx === undefined ? 'selected' : ''}>ohne Platz</option>`; };
+  const fill = () => { const h = hallById(hs.value); ps.innerHTML = Array.from({ length: h ? h.courts : 0 }, (_, i) => `<option value="${i}" ${hs.value === s.hall_id && i === s.court_idx ? 'selected' : ''}>${courtOptLabel(h, i)}</option>`).join('') + `<option value="" ${s.court_idx === null || s.court_idx === undefined ? 'selected' : ''}>ohne Platz</option>`; };
   hs.addEventListener('change', fill); fill();
   const row = document.createElement('div'); row.className = 'row';
   const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-small'; ok.textContent = 'Speichern';
@@ -962,8 +974,10 @@ function timeEditor(s, host) {
 }
 function moveSlot(s, hall, court_idx) {
   if (!hall) return;
-  const court = court_idx === null ? hall.name : `${hall.name} · Platz ${court_idx + 1}`;
-  updateSlot(s, { hall_id: hall.id, court, court_idx }, `Termin jetzt in ${court}.`, 'Halle ändern');
+  const court = court_idx === null ? hall.name : `${hall.name} · ${courtName(hall, court_idx)}`;
+  const patch = { hall_id: hall.id, court, court_idx };
+  if (!isTournament(s)) patch.max_players = court_idx === null ? MAX_PLAYERS : capFor(hall, court_idx);
+  updateSlot(s, patch, `Termin jetzt in ${court}.`, 'Halle ändern');
 }
 async function updateSlot(s, patch, msg, what) {
   try {
@@ -1033,15 +1047,16 @@ function slotForm(dateKey) {
   f.querySelector('[data-cancel]').addEventListener('click', () => renderWeek());
   const hallSel = f.querySelector(`#c-${uid}`), nameIn = f.querySelector(`#cn-${uid}`), placeSel = f.querySelector(`#p-${uid}`);
   const pre = dayHall[dateKey]; if (pre && hallById(pre)) hallSel.value = pre;
-  const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">Platz ${i + 1}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
+  const fillPlaces = () => { const h = hallById(hallSel.value), nC = h ? h.courts : 0; placeSel.innerHTML = Array.from({ length: nC }, (_, i) => `<option value="${i}">${courtOptLabel(h, i)}</option>`).join('') + '<option value="">ohne Platz</option>'; nameIn.hidden = !!hallSel.value; };
   hallSel.addEventListener('change', fillPlaces); fillPlaces();
   const trCb = f.querySelector(`#tr-${uid}`); if (trCb) trCb.addEventListener('change', () => { f.querySelector(`#trf-${uid}`).hidden = !trCb.checked; });
   f.addEventListener('submit', async e => {
     e.preventDefault();
     const time = f.querySelector(`#t-${uid}`).value, dur = +f.querySelector(`#d-${uid}`).value, h = hallById(hallSel.value), hall = h ? h.name : nameIn.value.trim().toUpperCase(), pv = placeSel.value;
     if (!time || !hall) { toast('Halle fehlt.'); return; }
-    const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · Platz ${court_idx + 1}`;
+    const court_idx = pv === '' ? null : +pv, court = court_idx === null ? hall : `${hall} · ${courtName(h, court_idx)}`;
     const rec = { group_id: G.id, hall_id: h ? h.id : null, date: dateKey, time, dur, court, court_idx, created_by: me.id };
+    if (h && court_idx !== null && isSingle(h, court_idx)) rec.max_players = 2;
     if (trCb && trCb.checked) { rec.kind = 'tournament'; rec.title = f.querySelector(`#tt-${uid}`).value.trim() || 'Turnier'; rec.max_players = Math.max(1, Math.min(40, +f.querySelector(`#tm-${uid}`).value || 2)); }
     const { data: slot, error } = await sb.from('slots').insert(rec).select().single();
     if (error) { fail(error, 'Slot anlegen'); return; }
@@ -1110,6 +1125,10 @@ function renderHalls() {
     const r = document.createElement('div'); r.className = 'hall-row';
     r.innerHTML = `<input type="checkbox" ${inTeam.has(h.id) ? 'checked' : ''} title="im Team"><input type="text" value="${h.name}" maxlength="40"><input type="number" min="1" max="12" value="${h.courts}" title="Plätze"><button class="btn btn-ghost btn-small" type="button">Speichern</button>`;
     const [cb, nameIn, courtsIn, save] = r.children;
+    let singles = Array.isArray(h.singles) ? [...h.singles] : [];
+    const chips = document.createElement('div'); chips.className = 'court-chips';
+    const paintChips = () => { chips.innerHTML = ''; const nC = Math.max(1, Math.min(12, +courtsIn.value || h.courts)); for (let i = 0; i < nC; i++) { const b = document.createElement('button'); b.type = 'button'; b.className = 'court-chip' + (singles.includes(i) ? ' single' : ''); b.textContent = (singles.includes(i) ? 'E' : 'P') + (i + 1); b.title = singles.includes(i) ? 'Einzelplatz (2 Spieler) · Tippen: normaler Platz' : 'Platz (4 Spieler) · Tippen: Einzelplatz'; b.addEventListener('click', () => { singles = singles.includes(i) ? singles.filter(x => x !== i) : [...singles, i].sort((a, b) => a - b); paintChips(); }); chips.append(b); } };
+    courtsIn.addEventListener('input', paintChips); paintChips(); r.append(chips);
     cb.addEventListener('change', async () => {
       try {
         if (cb.checked) { const { error } = await sb.from('group_halls').insert({ group_id: G.id, hall_id: h.id }); if (error) throw error; }
@@ -1120,7 +1139,9 @@ function renderHalls() {
     save.addEventListener('click', async () => {
       const name = nameIn.value.trim().toUpperCase(), courts = Math.max(1, Math.min(12, +courtsIn.value || 3));
       if (!name) { toast('Name fehlt.'); return; }
-      const { error } = await sb.from('halls').update({ name, courts }).eq('id', h.id);
+      singles = singles.filter(i => i < courts);
+      let { error } = await sb.from('halls').update({ name, courts, singles }).eq('id', h.id);
+      if (error && /singles/.test(error.message || '')) { ({ error } = await sb.from('halls').update({ name, courts }).eq('id', h.id)); if (!error && singles.length) toast('Einzelplätze brauchen noch migration-singles.sql in Supabase.'); }
       if (error) { fail(error, 'Halle speichern'); return; }
       toast(`${name} gespeichert.`); await reload(); renderHalls();
     });

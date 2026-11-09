@@ -20,6 +20,7 @@ Der Organisator importiert die Platzbelegung der EUROPAHALLE per Screenshot, die
 4. Seite veröffentlichen: GitHub Pages aus dem `main`-Branch, Ordner `/` (root).
 4b. Teams: danach `supabase/migration-groups.sql` ausführen (legt TEAM KITE mit den bestehenden Daten und TEAM 123 an). Jedes Team hat einen eigenen Link, z. B. `padelwithfriends.at/#kite`.
 4c. Hallen: danach `supabase/migration-halls.sql` ausführen. Hallen (Name, Plätze) legt der Organisator in der App an und ordnet sie seinem Team zu; der Import fragt nach der Halle.
+4d. Weitere Erweiterungen, jeweils einmal ausführen: `migration-cancel.sql` (Absagen), `migration-comments.sql` (Kommentare), `migration-avail-part.sql` (Vormittag/Nachmittag), `migration-tournament.sql` (Turniere), `migration-reserved.sql` (Haken „Platz ist fix reserviert“), `migration-singles.sql` (Einzelplätze mit 2 Spielern, pro Halle im Hallen-Dialog markierbar).
 5. Domain `padelwithfriends.at`: A-Records auf 185.199.108.153, 185.199.109.153, 185.199.110.153, 185.199.111.153 und CNAME `www` → `peterho-lab.github.io`; die Datei `CNAME` im Repository trägt die Domain bei GitHub Pages ein.
 
 ## Sicherheit
