@@ -492,11 +492,12 @@ async function loadGroup() {
   if (!G) { DB.slots = []; DB.avail = []; DB.grids = {}; return; }
   const [s, g, a] = await Promise.all([
     sb.from('slots').select('*, signups(*)').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
-    sb.from('court_grid').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
+    (() => { const ids = teamHalls().map(h => h.id); return ids.length ? sb.from('court_grid').select('*').in('hall_id', ids).gte('date', rangeFrom).lt('date', rangeTo) : Promise.resolve({ data: [] }); })(),
     sb.from('availability').select('*').eq('group_id', G.id).gte('date', rangeFrom).lt('date', rangeTo),
   ]);
   const err = [s, g, a].find(r => r.error); if (err) throw err.error;
-  DB.slots = s.data; DB.avail = a.data; DB.grids = Object.fromEntries(g.data.map(r => [gridKey(r.hall_id, r.date), r]));
+  DB.slots = s.data; DB.avail = a.data; DB.grids = {};
+  g.data.forEach(r => { const k = gridKey(r.hall_id, r.date), cur = DB.grids[k]; if (!cur || (r.group_id === G.id && cur.group_id !== G.id) || (cur.group_id !== G.id && (r.imported_at || '') > (cur.imported_at || ''))) DB.grids[k] = r; });
   const ids = DB.slots.map(x => x.id);
   const c = ids.length ? await sb.from('comments').select('*').in('slot_id', ids) : { data: [] };
   DB.commentsOk = !c.error; if (c.error) console.warn('Kommentare nicht verfügbar', c.error.message);
@@ -720,7 +721,7 @@ function renderWeek() {
       gridHours.forEach(hh => {
         const lab = document.createElement('span'); lab.className = 'cg-h'; lab.textContent = `${hh}–${hh + 1}`; lab.title = `${pad(hh)}:00 bis ${pad(hh + 1)}:00`; grid.append(lab);
         for (let c = 0; c < hall.courts; c++) {
-          const ov = overlay[`${hh},${c}`], st = ov ? 'M' : (cg[hh][c] || '.'), b = document.createElement('button'); b.type = 'button';
+          const ov = overlay[`${hh},${c}`], raw = cg[hh][c] || '.', st = ov ? 'M' : raw === 'M' ? 'X' : raw, b = document.createElement('button'); b.type = 'button';
           b.className = 'cg-cell ' + (st === 'o' ? 'free' : st === 'X' ? 'booked' : st === 'M' ? 'ours' + (ov === 'F' ? ' full' : '') : '') + (isSingle(hall, c) ? ' single' : '');
           b.title = st === 'o' ? `${hall.name}, ${courtName(hall, c)}, ${hh}–${hh + 1} Uhr frei${isSingle(hall, c) ? ' (2 Spieler)' : ''}. Tippen: Slot anlegen und dich eintragen` : st === 'X' ? 'In der Halle gebucht' : st === 'M' ? (ov === 'F' ? 'Unser Slot, Match steht' : 'Unser Slot') : 'Nicht buchbar';
           if (st === 'o') b.addEventListener('click', () => claimFree(key, hall, hh, c)); else b.disabled = true;
@@ -913,7 +914,7 @@ async function toggleAvail(key, mine, part) {
 }
 async function saveGrid(hallId, key, grid) {
   const row = DB.grids[gridKey(hallId, key)]; if (!row) return;
-  const { error } = await sb.from('court_grid').update({ grid }).eq('group_id', G.id).eq('hall_id', hallId).eq('date', key); if (error) throw error;
+  const { error } = await sb.from('court_grid').update({ grid }).eq('group_id', row.group_id).eq('hall_id', hallId).eq('date', key); if (error) throw error;
 }
 function withCell(grid, hh, c, st) { const g = { ...grid }; if (g[hh]) g[hh] = g[hh].slice(0, c) + st + g[hh].slice(c + 1); return g; }
 function choose(title, text, options) {
