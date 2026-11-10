@@ -219,6 +219,13 @@ input[type=email], input[type=text], input[type=time], select {
 .comment { display: flex; gap: 8px; align-items: flex-start; font-size: .85rem; line-height: 1.35; }
 .comment .dot { width: 22px; height: 22px; font-size: .62rem; margin-top: 1px; }
 .comment b { font-weight: 700; }
+.comment > span { min-width: 0; overflow-wrap: anywhere; }
+.comment a { color: inherit; font-weight: 600; text-decoration: underline; }
+.slot-tools { display: flex; gap: 12px; flex-wrap: wrap; }
+.slot-tools .linkbtn.sm { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.slot-tools .linkbtn.sm:hover { text-decoration: underline; }
+.slot.flash { animation: flash 1.6s ease-out 2; }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(242,229,58,.9); } 70% { box-shadow: 0 0 0 10px rgba(242,229,58,0); } 100% { box-shadow: 0 0 0 0 rgba(242,229,58,0); } }
 .comment .cdel { margin-left: auto; background: none; border: 0; color: var(--ink-soft); padding: 0 2px; cursor: pointer; font-size: 1rem; line-height: 1; }
 .comment-form { display: flex; gap: 6px; }
 .comment-form input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: .85rem; }
@@ -459,7 +466,19 @@ function fail(error, what) { console.error(what, error); toast(`${what} hat nich
 
 const person = id => DB.players.find(p => p.id === id);
 const admins = () => DB.players.filter(p => p.admin);
-const hashSlug = () => { try { return decodeURIComponent(location.hash.slice(1)).trim().toLowerCase(); } catch (e) { return ''; } };
+const hashParts = () => { try { return decodeURIComponent(location.hash.slice(1)).trim().split('/'); } catch (e) { return ['']; } };
+const hashSlug = () => hashParts()[0].toLowerCase();
+let pendingSlotId = null;
+// Link-Ziel aus dem Hash übernehmen: #team/2026-11-09 springt zur Woche, #team/2026-11-09/<slot-id> zusätzlich zum Termin
+function applyHashTarget() {
+  const [, dateKey, slotId] = hashParts();
+  if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    const off = Math.round((mondayOf(new Date(dateKey + 'T12:00:00')) - thisMonday) / 6048e5);
+    weekOffset = Math.max(0, Math.min(MAX_WEEKS_AHEAD, off));
+  }
+  pendingSlotId = slotId || null;
+}
+const weekLink = (dateKey, slotId) => `${location.origin}${location.pathname}#${G ? G.slug : ''}/${iso(mondayOf(new Date(dateKey + 'T12:00:00')))}${slotId ? '/' + slotId : ''}`;
 const groupBySlug = slug => DB.groups.find(g => g.slug === slug);
 const membersOf = g => DB.memberships.filter(m => m.group_id === g.id);
 const members = () => { if (!G) return []; const ids = new Set(membersOf(G).map(m => m.player_id)); return DB.players.filter(p => ids.has(p.id)); };
@@ -591,7 +610,7 @@ async function chooseGroup(preferSlug, atLogin) {
 }
 async function setGroup(g) {
   G = g; applyGroup(); LS.set('pwf-group', g.slug);
-  if (hashSlug() !== g.slug) history.replaceState(null, '', '#' + g.slug);
+  applyHashTarget(); history.replaceState(null, '', '#' + g.slug);
   document.title = `${g.name} · Padel With Friends`;
   $('#group-modal').hidden = true;
   joinPresence();
@@ -611,7 +630,11 @@ function showApp() {
   renderLegend(); renderWeek();
 }
 $('#logout').addEventListener('click', () => { leavePresence(); me = null; G = null; LS.del('pwf-user'); showApp(); });
-window.addEventListener('hashchange', () => { const g = groupBySlug(hashSlug()); if (me && g && (!G || g.id !== G.id)) chooseGroup(g.slug); });
+window.addEventListener('hashchange', () => {
+  const g = groupBySlug(hashSlug()); if (!me || !g) return;
+  if (!G || g.id !== G.id) chooseGroup(g.slug);
+  else { applyHashTarget(); history.replaceState(null, '', '#' + g.slug); renderWeek(); }
+});
 
 // ======================= Team wählen / anlegen =======================
 $('#group-pill').addEventListener('click', () => openGroupChooser(false));
@@ -746,6 +769,7 @@ function renderWeek() {
     }
     wrap.append(col);
   }
+  if (pendingSlotId) { const el = wrap.querySelector(`[data-id="${pendingSlotId}"]`); pendingSlotId = null; if (el) { el.classList.add('flash'); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }), 50); } }
 }
 
 function endTime(time, dur) { const [h, m] = time.split(':').map(Number); const t = h * 60 + m + dur; return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; }
@@ -755,7 +779,7 @@ function renderSlot(s, isPast) {
   const cap = capOf(s), tour = isTournament(s), full = players.length >= cap, mine = players.some(x => x.player_id === me.id), onWait = wait.some(x => x.player_id === me.id);
   const cancelled = !!s.cancelled_at, canceller = cancelled ? person(s.cancelled_by) : null;
   const el = document.createElement('article'); el.className = 'slot' + (tour ? ' tournament' : '') + (cancelled ? ' cancelled' : full ? ' full' : '') + (mine && !cancelled ? ' mine' : '');
-  const creator = person(s.created_by), slotHall = s.hall_id ? hallById(s.hall_id) : null;
+  const creator = person(s.created_by), slotHall = s.hall_id ? hallById(s.hall_id) : null; el.dataset.id = s.id;
   el.innerHTML = `${tour ? `<div class="tour-head"><span class="tour-tag">Turnier</span><b></b></div>` : ''}<div class="slot-top"><div class="when"><div class="time">${s.time}</div><div class="dur">bis ${endTime(s.time, s.dur)} · ${s.dur} Min</div></div><div class="slot-right"><span class="court"${slotHall ? ` style="background:${hallColor(slotHall)};color:#fff"` : ''}>${s.court}</span><span class="creator" title="angelegt von ${creator ? creator.name : '?'}">von ${creator ? shortOf(creator) : '?'}</span></div></div>`;
   if (!isPast && !cancelled && (canOrganize() || s.created_by === me.id)) {
     const cb = el.querySelector('.court'); cb.classList.add('editable'); cb.title = 'Tippen: Halle oder Platz ändern'; cb.addEventListener('click', () => hallEditor(s, el.querySelector('.slot-right')));
@@ -784,6 +808,12 @@ function renderSlot(s, isPast) {
   el.append(st);
   if (wait.length) { const w = document.createElement('div'); w.className = 'wait'; w.textContent = 'Warteliste: ' + wait.map(x => (person(x.player_id) || {}).name || '?').join(', '); el.append(w); }
   const dl = document.createElement('div'); dl.className = 'dateline'; dl.textContent = longDate(s.date); if (slotHall && slotHall.address) dl.insertAdjacentHTML('beforeend', addrLink(slotHall, 'addr')); el.append(dl);
+  if (!cancelled) {
+    const tools = document.createElement('div'); tools.className = 'slot-tools';
+    const cal = document.createElement('button'); cal.type = 'button'; cal.className = 'linkbtn sm'; cal.textContent = '📅 Kalender'; cal.title = 'In deinen Kalender eintragen'; cal.addEventListener('click', () => addToCalendar(s));
+    const sh = document.createElement('button'); sh.type = 'button'; sh.className = 'linkbtn sm'; sh.textContent = '↗ Teilen'; sh.title = 'Per WhatsApp teilen'; sh.addEventListener('click', () => shareSlot(s));
+    tools.append(cal, sh); el.append(tools);
+  }
   if (!isPast && cancelled && canOrganize()) {
     const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'linkbtn sm'; rb.textContent = 'Absage zurücknehmen';
     rb.addEventListener('click', () => restoreSlot(s)); el.append(rb);
@@ -804,13 +834,53 @@ function renderSlot(s, isPast) {
   return el;
 }
 
+// Text mit klickbaren Links einfügen (URL gekürzt angezeigt)
+function appendLinked(host, text) {
+  const re = /https?:\/\/[^\s<>"']+/g; let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) host.append(document.createTextNode(text.slice(last, m.index)));
+    const a = document.createElement('a'); a.href = m[0]; a.target = '_blank'; a.rel = 'noopener'; a.title = m[0];
+    const short = m[0].replace(/^https?:\/\/(www\.)?/, ''); a.textContent = short.length > 42 ? short.slice(0, 40) + '…' : short; host.append(a);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) host.append(document.createTextNode(text.slice(last)));
+}
+// ---------- Teilen und Kalender ----------
+function slotSummary(s) {
+  const hall = s.hall_id ? hallById(s.hall_id) : null, players = slotPlayers(s).map(x => person(x.player_id)).filter(Boolean), cap = capOf(s), open = cap - players.length;
+  const d = new Date(s.date + 'T12:00:00'), when = `${WD_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}. ${MON[d.getMonth()]}, ${s.time}–${endTime(s.time, s.dur)}`;
+  const who = players.length ? `Dabei: ${players.map(shortOf).join(', ')}` : 'Noch niemand eingetragen';
+  const status = open <= 0 ? (isTournament(s) ? 'Team komplett ✔' : 'Match steht ✔') : `Noch ${open} ${open === 1 ? 'Platz' : 'Plätze'} frei – wer ist dabei?`;
+  return { hall, players, open, when, who, status, title: `Padel · ${G.name} · ${s.court}`, loc: hall ? (hall.address ? `${hall.name}, ${hall.address}` : hall.name) : s.court, link: weekLink(s.date, s.id) };
+}
+function shareSlot(s) {
+  const i = slotSummary(s);
+  const text = `🎾 ${isTournament(s) ? (s.title || 'Turnier') + ' · ' : ''}${i.when} · ${s.court}\n${i.who}\n${i.status}\n${i.link}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+}
+const icsStamp = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const icsEsc = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+async function addToCalendar(s) {
+  const i = slotSummary(s), start = new Date(`${s.date}T${s.time}:00`), end = new Date(start.getTime() + s.dur * 60000);
+  const details = `${i.who}\n${i.status}\n${i.link}`;
+  const pick = await choose('In Kalender eintragen', `${i.when} · ${s.court}`, [
+    { value: 'google', label: 'Google Kalender' }, { value: 'outlook', label: 'Outlook.com' }, { value: 'ics', label: 'Apple, Outlook-App, andere', hint: '.ics-Datei' },
+  ]); if (!pick) return;
+  if (pick === 'google') window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(i.title)}&dates=${icsStamp(start)}/${icsStamp(end)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(i.loc)}`, '_blank', 'noopener');
+  else if (pick === 'outlook') window.open(`https://outlook.live.com/calendar/0/action/compose?rru=addevent&subject=${encodeURIComponent(i.title)}&startdt=${encodeURIComponent(start.toISOString())}&enddt=${encodeURIComponent(end.toISOString())}&body=${encodeURIComponent(details)}&location=${encodeURIComponent(i.loc)}`, '_blank', 'noopener');
+  else {
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Padel With Friends//DE', 'BEGIN:VEVENT', `UID:${s.id}@padelwithfriends.at`, `DTSTAMP:${icsStamp(new Date())}`, `DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`,
+      `SUMMARY:${icsEsc(i.title)}`, `LOCATION:${icsEsc(i.loc)}`, `DESCRIPTION:${icsEsc(details)}`, `URL:${i.link}`, 'BEGIN:VALARM', 'TRIGGER:-PT3H', 'ACTION:DISPLAY', 'DESCRIPTION:Padel in 3 Stunden', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' })); a.download = `padel-${s.date}-${s.time.replace(':', '')}.ics`; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+}
 function renderComments(s, isPast) {
   const box = document.createElement('div'); box.className = 'comments';
   const list = (s.comments || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
   list.forEach(c => {
     const p = person(c.player_id), row = document.createElement('div'); row.className = 'comment';
     if (p) row.append(dot(p)); else { const d = document.createElement('span'); d.className = 'dot'; d.textContent = '?'; row.append(d); }
-    const t = document.createElement('span'); t.innerHTML = `<b>${p ? p.name : 'Unbekannt'}:</b> `; t.append(document.createTextNode(c.text)); row.append(t);
+    const t = document.createElement('span'); t.innerHTML = `<b>${p ? p.name : 'Unbekannt'}:</b> `; appendLinked(t, c.text); row.append(t);
     if (!isPast && (c.player_id === me.id || canOrganize())) { const x = document.createElement('button'); x.type = 'button'; x.className = 'cdel'; x.textContent = '×'; x.title = 'Kommentar löschen'; x.addEventListener('click', () => deleteComment(c)); row.append(x); }
     box.append(row);
   });
