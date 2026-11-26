@@ -99,6 +99,13 @@ input[type=email], input[type=text], input[type=time], select {
 .legend-status { padding-top: 18px; padding-bottom: 0; }
 .grid-meta { text-align: center; font-size: .8rem; color: var(--ink-soft); padding-bottom: 12px; }
 .grid-meta b { color: var(--ink); }
+.ev-card { width: min(100%, 560px); }
+.ev-body { display: grid; gap: 12px; font-size: .95rem; line-height: 1.45; }
+.ev-body p { margin: 0; }
+.ev-body a:not(.bm) { color: var(--accent); font-weight: 700; }
+.bm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.bm { display: inline-block; background: var(--ball); color: #173A14; font-weight: 800; padding: 10px 16px; border-radius: 12px; text-decoration: none; cursor: grab; }
+.ev-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .admin-tools { display: none; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .admin .admin-tools { display: flex; }
 
@@ -334,6 +341,7 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     </div>
     <div class="admin-tools">
       <button class="btn btn-ball btn-small" id="import-btn" type="button">Screenshot importieren</button>
+      <button class="btn btn-ghost btn-small" id="ev-btn" type="button">Eversports-Import</button>
       <button class="btn btn-ghost btn-small" id="players-btn" type="button">Spieler verwalten</button>
       <button class="btn btn-ghost btn-small" id="halls-btn" type="button">Hallen</button>
     </div>
@@ -365,6 +373,14 @@ footer { text-align: center; color: var(--ink-soft); font-size: .8rem; padding-b
     <div class="preview-wrap" id="imp-preview-wrap" hidden><canvas id="imp-canvas"></canvas></div>
     <div class="imp-summary" id="imp-summary"></div>
     <div class="row"><button class="btn btn-primary" id="imp-apply" type="button" disabled>Übernehmen</button></div>
+  </div>
+</div>
+
+<!-- Eversports-Import -->
+<div class="modal" id="ev-modal" hidden>
+  <div class="modal-card ev-card">
+    <div class="slot-top"><h2>Belegung von Eversports holen</h2><button class="linkbtn" id="ev-close" type="button">Schließen</button></div>
+    <div class="ev-body" id="ev-body"></div>
   </div>
 </div>
 
@@ -692,7 +708,7 @@ function renderWeek() {
   $('#prev').disabled = weekOffset === 0; $('#next').disabled = weekOffset === MAX_WEEKS_AHEAD;
   const fmt = t => { const d = new Date(t); return `${d.getDate()}. ${MON[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   const halls = teamHalls();
-  $('#grid-meta').innerHTML = halls.length ? halls.map(h => { const wg = Array.from({ length: 7 }, (_, i) => DB.grids[gridKey(h.id, iso(addDays(mon, i)))]).filter(Boolean); return wg.length ? `${h.name}: Belegung importiert am <b>${fmt(wg[0].imported_at)}</b>` : `${h.name}: <b>noch kein Screenshot importiert</b>`; }).join(' · ') : 'Noch keine Halle im Team. <b>Hallen</b> im Organisator-Modus wählen.';
+  $('#grid-meta').innerHTML = halls.length ? halls.map(h => { const wg = Array.from({ length: 7 }, (_, i) => DB.grids[gridKey(h.id, iso(addDays(mon, i)))]).filter(Boolean); return wg.length ? `${h.name}: Belegung ${wg[0].source === 'eversports' ? 'von Eversports' : 'aus Screenshot'} vom <b>${fmt(wg[0].imported_at)}</b>` : `${h.name}: <b>noch keine Belegung importiert</b>`; }).join(' · ') : 'Noch keine Halle im Team. <b>Hallen</b> im Organisator-Modus wählen.';
 
   const wrap = $('#days'); wrap.innerHTML = '';
   for (let i = 0; i < 7; i++) {
@@ -1436,6 +1452,158 @@ $('#imp-apply').addEventListener('click', async () => {
   } catch (e) { fail(e, 'Import'); }
 });
 
+// ======================= Eversports-Import per Lesezeichen =======================
+// Eversports liefert den Belegungsplan nur an echte Browser. Ein Lesezeichen, das auf der Eversports-Seite
+// angeklickt wird, holt die Daten dort (gleiche Herkunft, eigene Sitzung des Nutzers) und reicht sie per
+// postMessage an dieses Fenster weiter. Die App rechnet sie ins Raster um und speichert für alle Teams mit der Halle.
+const EV = {
+  origin: 'https://www.eversports.at',
+  sport: { id: 978, slug: 'padel', name: 'Padel', uuid: 'b388f5e3-69de-11e8-bdc6-02bd505aa7b2' },
+  halls: [
+    { name: 'PADELZONE WIENERBERG', facilityId: 77636, slug: 'padelzone-wien-or-candc-wienerberg' },
+    { name: 'PADELZONE VÖSENDORF', facilityId: 82615, slug: 'padelzone-voesendorf' },
+  ],
+};
+const evHalls = () => EV.halls.map(e => ({ ...e, hall: DB.halls.find(h => h.name.toUpperCase() === e.name) })).filter(e => e.hall);
+const evConfig = () => ({ type: 'pwf-config', sport: EV.sport, halls: evHalls().map(e => ({ name: e.hall.name, facilityId: e.facilityId, slug: e.slug })), dates: Array.from({ length: MAX_WEEKS_AHEAD + 1 }, (_, w) => iso(addDays(thisMonday, w * 7))) });
+
+// Läuft NICHT hier, sondern als Lesezeichen auf www.eversports.at (wird unten als javascript:-URL verpackt). Keine App-Variablen verwenden.
+function evBookmarklet(A) {
+  if (location.hostname !== 'www.eversports.at') { alert('Bitte zuerst den Buchungsplan auf www.eversports.at öffnen und dort auf das Lesezeichen klicken.'); return; }
+  var w = window.open(A + '/?ev-import=1', 'pwf-import'); if (!w) { alert('Das Fenster von Padel With Friends wurde blockiert. Bitte Pop-ups für eversports.at erlauben.'); return; }
+  var box = document.createElement('div'); box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;background:#173A14;color:#fff;padding:12px 16px;border-radius:12px;font:14px/1.4 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35);max-width:320px';
+  document.body.appendChild(box); var say = function (t) { box.textContent = 'Padel With Friends: ' + t; }; say('warte auf die App …');
+  var got = false, hello = setInterval(function () { if (w.closed) { clearInterval(hello); say('Das App-Fenster wurde geschlossen.'); return; } w.postMessage({ type: 'pwf-hello' }, A); }, 700);
+  setTimeout(function () { if (!got) { clearInterval(hello); say('Keine Antwort von der App. Bist du dort eingeloggt und Organisator?'); } }, 60000);
+  window.addEventListener('message', async function (e) {
+    if (e.origin !== A || !e.data || e.data.type !== 'pwf-config' || got) return;
+    got = true; clearInterval(hello);
+    var halls = e.data.halls, dates = e.data.dates, sport = e.data.sport, out = [], n = 0, total = halls.length * dates.length;
+    for (var i = 0; i < halls.length; i++) for (var j = 0; j < dates.length; j++) {
+      var h = halls[i], d = dates[j]; n++; say('lade ' + h.name + ', Woche ab ' + d + ' (' + n + '/' + total + ')');
+      try {
+        var body = new URLSearchParams({ facilityId: String(h.facilityId), facilitySlug: h.slug, 'sport[id]': String(sport.id), 'sport[slug]': sport.slug, 'sport[name]': sport.name, 'sport[uuid]': sport.uuid, date: d, type: 'user' });
+        var r = await fetch('/api/booking/calendar/update', { method: 'POST', body: body, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var html = await r.text(), courts = [], m, re = /data-court="(\d+)"/g;
+        while ((m = re.exec(html))) if (courts.indexOf(m[1]) < 0) courts.push(m[1]);
+        var q = new URLSearchParams({ facilityId: String(h.facilityId), startDate: d }); courts.forEach(function (c) { q.append('courts[]', c); });
+        var s = await fetch('/api/slot?' + q, { headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+        if (!s.ok) throw new Error('HTTP ' + s.status);
+        out.push({ facilityId: h.facilityId, date: d, html: html, slots: (await s.json()).slots || [] });
+      } catch (err) { out.push({ facilityId: h.facilityId, date: d, error: String((err && err.message) || err) }); }
+    }
+    w.postMessage({ type: 'pwf-data', results: out }, A); say('fertig. Das Ergebnis steht in der App.'); w.focus();
+    setTimeout(function () { box.remove(); }, 6000);
+  });
+}
+const evBookmarkletUrl = () => 'javascript:' + encodeURIComponent(`(${evBookmarklet.toString().replace(/\s*\n\s*/g, ' ')})(${JSON.stringify(location.origin)})`);
+
+// Kalender-HTML von Eversports → Plätze in Reihenfolge der Seite und Zeitfenster je Tag und Platz
+const evAttr = (tag, name) => { const m = tag.match(new RegExp(`${name}=['"]([^'"]*)['"]`)); return m ? m[1] : null; };
+const evMin = s => Math.floor(+s / 100) * 60 + (+s % 100);
+function evParse(html) {
+  const courts = [], seen = new Set();
+  for (const m of html.matchAll(/<td data-court="(\d+)"[^>]*>[\s\S]*?court-name[^>]*>([^<]*)</g)) { if (!seen.has(m[1])) { seen.add(m[1]); courts.push({ id: +m[1], name: m[2].trim() }); } }
+  const days = {};
+  for (const tb of html.matchAll(/<tbody data-date="(\d{4}-\d{2}-\d{2})">([\s\S]*?)<\/tbody>/g)) {
+    const cells = {};
+    for (const td of tb[2].matchAll(/<td [^>]*data-state="[^"]*"[^>]*>/g)) {
+      const t = td[0], court = evAttr(t, 'data-court'), start = evAttr(t, 'data-start'), end = evAttr(t, 'data-end');
+      if (court && start && end) (cells[court] = cells[court] || []).push({ start: evMin(start), end: evMin(end), state: evAttr(t, 'data-state') });
+    }
+    days[tb[1]] = cells;
+  }
+  return { courts, days };
+}
+// Tag → Raster { stunde: 'oX.' }: 'o' frei (beide halben Stunden frei und nicht gebucht), 'X' belegt, '.' nicht buchbar
+function evGrid(cells, courts, bookedSet, date) {
+  const grid = {};
+  for (let hh = 0; hh < 24; hh++) {
+    let row = '';
+    for (const c of courts) {
+      const list = cells[c.id] || [], h0 = hh * 60, h1 = h0 + 60, covering = list.filter(x => x.start < h1 && x.end > h0);
+      if (!covering.length) { row += '.'; continue; }
+      let free = true, closed = true;
+      for (let m = h0; m < h1; m += 30) {
+        const cell = covering.find(x => x.start <= m && x.end > m);
+        if (!cell) { free = false; continue; }
+        if (cell.state !== 'closed') closed = false;
+        if (cell.state !== 'free' || bookedSet.has(`${date}|${c.id}|${cell.start}`)) free = false;
+      }
+      row += closed ? '.' : free ? 'o' : 'X';
+    }
+    if (!/^\.+$/.test(row)) grid[hh] = row;
+  }
+  return grid;
+}
+
+async function evApply(results) {
+  const stamp = new Date().toISOString(), lines = [], rows = [], patches = [];
+  for (const e of evHalls()) {
+    const mine = results.filter(r => r && r.facilityId === e.facilityId); if (!mine.length) continue;
+    const groupIds = [...new Set(DB.groupHalls.filter(gh => gh.hall_id === e.hall.id).map(gh => gh.group_id))];
+    if (!groupIds.length) { lines.push(`${e.hall.name}: keinem Team zugeordnet, übersprungen.`); continue; }
+    const errs = mine.filter(r => r.error); let nDays = 0, nFree = 0, first = 24, last = 0, warn = '';
+    for (const r of mine) {
+      if (r.error || typeof r.html !== 'string') continue;
+      const cal = evParse(r.html); if (!cal.courts.length) continue;
+      if (cal.courts.length !== e.hall.courts) warn = ` Achtung: Eversports zeigt ${cal.courts.length} Plätze (${cal.courts.map(c => c.name).join(', ')}), die Halle hat ${e.hall.courts}.`;
+      const booked = new Set((r.slots || []).map(s => `${s.date}|${s.court}|${evMin(s.start)}`));
+      for (const [day, cells] of Object.entries(cal.days)) {
+        const grid = evGrid(cells, cal.courts, booked, day), hours = Object.keys(grid).map(Number); if (!hours.length) continue;
+        first = Math.min(first, ...hours); last = Math.max(last, ...hours); nDays++; nFree += Object.values(grid).join('').split('o').length - 1;
+        groupIds.forEach(gid => rows.push({ group_id: gid, hall_id: e.hall.id, date: day, court: e.hall.name, grid, source: 'eversports', imported_at: stamp }));
+      }
+    }
+    if (first <= last) patches.push({ id: e.hall.id, first_hour: first, last_hour: last });
+    const teams = groupIds.map(gid => (DB.groups.find(g => g.id === gid) || {}).name).filter(Boolean);
+    lines.push(`${e.hall.name}: ${nDays} Tage, ${nFree} freie Platz-Stunden, gespeichert für ${teams.join(', ')}.` + (errs.length ? ` ${errs.length} Woche(n) konnten nicht geladen werden (${errs[0].error}).` : '') + warn);
+  }
+  try {
+    if (rows.length) { const { error } = await sb.from('court_grid').upsert(rows, { onConflict: 'group_id,hall_id,date' }); if (error) throw error; }
+    for (const p of patches) { const { error } = await sb.from('halls').update({ first_hour: p.first_hour, last_hour: p.last_hour }).eq('id', p.id); if (error) throw error; }
+    await reload();
+    openEv('done', lines.length ? lines : ['Von Eversports sind keine Daten angekommen.']);
+    toast(rows.length ? 'Belegung von Eversports übernommen.' : 'Keine Belegung übernommen.');
+  } catch (err) { openEv('done', lines.concat(`Speichern hat nicht geklappt: ${err.message || err}`)); }
+}
+
+let evLoginHint = false;
+window.addEventListener('message', async e => {
+  if (e.origin !== EV.origin || !e.data || typeof e.data.type !== 'string') return;
+  if (e.data.type === 'pwf-hello') {
+    if (!me || !G) { if (!evLoginHint) { evLoginHint = true; toast('Bitte einloggen, der Eversports-Import startet dann von selbst.'); } return; }
+    if (!canOrganize()) { openEv('role'); return; }
+    openEv('wait'); e.source.postMessage(evConfig(), e.origin);
+  } else if (e.data.type === 'pwf-data' && me && canOrganize()) {
+    openEv('busy'); await evApply(Array.isArray(e.data.results) ? e.data.results : []);
+  }
+});
+
+function openEv(mode, lines) {
+  const body = $('#ev-body'); body.innerHTML = '';
+  const p = (html) => { const el = document.createElement('p'); el.innerHTML = html; body.append(el); };
+  if (mode === 'install') {
+    const names = evHalls().map(e => e.hall.name);
+    p(`Eversports zeigt den Buchungsplan nur echten Browsern. Deshalb holt dein Browser die Belegung selbst: ein Lesezeichen, das du auf der Eversports-Seite anklickst, lädt ${names.length ? names.join(' und ') : 'die Eversports-Hallen'} für ${MAX_WEEKS_AHEAD + 1} Wochen und übergibt sie an dieses Fenster. Gespeichert wird für alle Teams mit der Halle.`);
+    const a = document.createElement('a'); a.className = 'bm'; a.href = evBookmarkletUrl(); a.textContent = '🎾 Padel-Import'; a.title = 'In die Lesezeichenleiste ziehen';
+    a.addEventListener('click', ev => { ev.preventDefault(); toast('Nicht klicken, sondern in die Lesezeichenleiste ziehen.'); });
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-ghost btn-small'; copy.textContent = 'Lesezeichen-Code kopieren';
+    copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(evBookmarkletUrl()); toast('Kopiert. Als Adresse eines neuen Lesezeichens einfügen.'); } catch (err) { toast('Kopieren hat nicht geklappt.'); } });
+    const row = document.createElement('div'); row.className = 'bm-row'; row.append(a, copy); body.append(row);
+    p('<b>Einrichten (einmal):</b> Lesezeichenleiste einblenden (Strg+Umschalt+B), dann den grünen Knopf dorthin ziehen. Oder den Code kopieren und als Adresse eines neuen Lesezeichens einfügen.');
+    p('<b>Belegung holen:</b> Buchungsplan einer Halle auf <a href="https://www.eversports.at/sb/padelzone-wien-or-candc-wienerberg" target="_blank" rel="noopener">eversports.at</a> öffnen, dort auf das Lesezeichen klicken. Es öffnet sich dieses Fenster, der Import läuft durch und zeigt hier das Ergebnis. Am PC am einfachsten, am Handy geht es in Chrome über die Adresszeile (Lesezeichen-Namen tippen).');
+  } else if (mode === 'wait') p('Verbunden mit Eversports. Die Pläne werden geladen, das Ergebnis erscheint hier …');
+  else if (mode === 'busy') p('Daten angekommen, Belegung wird gespeichert …');
+  else if (mode === 'role') p('Nur Organisatoren oder Admins dürfen die Belegung importieren.');
+  else if (mode === 'done') { const ul = document.createElement('ul'); ul.className = 'ev-list'; (lines || []).forEach(l => { const li = document.createElement('li'); li.textContent = l; ul.append(li); }); body.append(ul); }
+  $('#ev-modal').hidden = false;
+}
+$('#ev-btn').addEventListener('click', () => openEv('install'));
+$('#ev-close').addEventListener('click', () => { $('#ev-modal').hidden = true; });
+$('#ev-modal').addEventListener('click', e => { if (e.target === e.currentTarget) $('#ev-modal').hidden = true; });
+
 // ======================= Start =======================
 (async () => {
   if (!configured) return;
@@ -1445,6 +1613,7 @@ $('#imp-apply').addEventListener('click', async () => {
     if (hg) { $('#login-team').textContent = `Du kommst zu ${hg.name}.`; $('#login-team').hidden = false; }
     const saved = LS.get('pwf-user'); const p = saved && person(saved);
     if (p) { me = p; await chooseGroup(); }
+    if (me && new URLSearchParams(location.search).has('ev-import')) openEv('wait');
   } catch (e) { fail(e, 'Verbindung zur Datenbank'); }
 })();
 </script>

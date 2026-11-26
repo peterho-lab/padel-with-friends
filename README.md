@@ -37,6 +37,14 @@ Persönliche Daten (E-Mail-Adressen) liegen nur in der Datenbank, nicht im Repos
 - `supabase/schema.sql` – Tabellen, Trigger (4-Spieler-Regel, Warteliste rückt nach), Zugriffsregeln
 - `design/padel-mockup.html` – klickbarer Entwurf ohne Datenbank (Demo-Daten im Browser)
 
-## Automatischer Import (in Arbeit)
+## Belegung von Eversports holen (Lesezeichen)
 
-`scripts/import-eversports.mjs` liest den öffentlichen Belegungsplan der Eversports-Hallen (PADELZONE Wienerberg, PADELZONE Vösendorf) und schreibt ihn für alle Teams mit dieser Halle nach `court_grid`. Probelauf: `node scripts/import-eversports.mjs --dry`. Stand: Eversports liegt hinter Cloudflare-Bot-Schutz, Aufrufe aus Node werden derzeit mit 403 abgewiesen; der Parser ist gegen echte Antworten getestet. Ein Zeitplan (GitHub Actions) wird erst eingerichtet, wenn der Zugriff geklärt ist.
+Eversports (PADELZONE Wienerberg, PADELZONE Vösendorf) liefert den Buchungsplan nur an echte Browser. Deshalb holt der Browser des Organisators die Daten selbst:
+
+1. In der App im Organisator-Modus **Eversports-Import** öffnen und den grünen Knopf **Padel-Import** in die Lesezeichenleiste ziehen (einmalig).
+2. Buchungsplan einer Halle auf eversports.at öffnen und dort auf das Lesezeichen klicken.
+3. Das Lesezeichen lädt die Pläne aller Eversports-Hallen (laufende Woche + 4 Wochen) auf der Eversports-Seite und reicht sie per `postMessage` an das App-Fenster weiter. Die App rechnet sie ins Raster um und speichert `court_grid` für alle Teams, die die Halle nutzen.
+
+Die Zuordnung Halle → Eversports-Anlage steht in `index.html` in der Konstante `EV.halls` (Hallenname wie unter "Hallen", `facilityId`, `slug`). Das Lesezeichen enthält nichts Geheimes, es nutzt nur die eigene Browser-Sitzung.
+
+`scripts/import-eversports.mjs` enthält denselben Parser für einen Lauf ohne Browser (`node scripts/import-eversports.mjs --dry`). Er funktioniert erst, wenn Eversports oder die Halle einen Zugang freigibt, da Aufrufe aus Node derzeit mit 403 abgewiesen werden.
