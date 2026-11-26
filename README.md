@@ -36,3 +36,7 @@ Persönliche Daten (E-Mail-Adressen) liegen nur in der Datenbank, nicht im Repos
 - `assets/` – Logos und Bälle
 - `supabase/schema.sql` – Tabellen, Trigger (4-Spieler-Regel, Warteliste rückt nach), Zugriffsregeln
 - `design/padel-mockup.html` – klickbarer Entwurf ohne Datenbank (Demo-Daten im Browser)
+
+## Automatischer Import (in Arbeit)
+
+`scripts/import-eversports.mjs` liest den öffentlichen Belegungsplan der Eversports-Hallen (PADELZONE Wienerberg, PADELZONE Vösendorf) und schreibt ihn für alle Teams mit dieser Halle nach `court_grid`. Probelauf: `node scripts/import-eversports.mjs --dry`. Stand: Eversports liegt hinter Cloudflare-Bot-Schutz, Aufrufe aus Node werden derzeit mit 403 abgewiesen; der Parser ist gegen echte Antworten getestet. Ein Zeitplan (GitHub Actions) wird erst eingerichtet, wenn der Zugriff geklärt ist.
